@@ -4,12 +4,12 @@ Welcome to easymc
 easymc is a simple message channel library that provides two 
 common communication patterns.Its job is to define how multiple 
 applications communicate.Supports two communications:
-1.	IPC:Shared Memory
-2.	TCP:Transmission Control Protocol
+1.  IPC:Shared Memory
+2.  TCP:Transmission Control Protocol
 
 The following two protocols are currently available:
-1.	REQREP:allow a question and answer approach to use requests
-2.	SUBPUB:distributes messages to large sets of interested subscribers 
+1.  REQREP:allow a question and answer approach to use requests
+2.  SUBPUB:distributes messages to large sets of interested subscribers 
 
 Build it
 *********
