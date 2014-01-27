@@ -284,7 +284,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 					CloseHandle(client->evt);client->evt=NULL;
 				}
 #else
-				shmdt(client->buffer);client->buffer=NULL;
+				close(client->evt);client->evt=-1;
 #endif
 				if(0==map_erase(ipc_->server->connection,id)){
 					if(get_device_monitor(ipc_->id)){
@@ -1202,6 +1202,38 @@ void delete_ipc(struct ipc *ipc_){
 		heap_delete(ipc_->send_heap);
 		free(ipc_);
 	}
+}
+
+int close_ipc(struct ipc * ipc_,int id){
+	struct ipc_client *client=NULL;
+	if(!ipc_ || EMC_LOCAL!=ipc_->type) return -1;
+	if(map_get(ipc_->server->connection,id,(void **)&client) < 0) return -1;
+	write_ipc_data(ipc_,client,id,EMC_CMD_LOGOUT,NULL,0);
+	client->connected=0;
+#if defined (EMC_WINDOWS)
+	if(client->evt){
+		CloseHandle(client->evt);client->evt=NULL;
+	}
+#else
+	close(client->evt);client->evt=-1;
+#endif
+	if(0==map_erase(ipc_->server->connection,id)){
+		if(get_device_monitor(ipc_->id)){
+			// If you set the monitor to throw on disconnect events
+			struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
+			if(md){
+				md->events=EMC_EVENT_CLOSED;
+				md->id=client->id;
+				strncpy(md->ip,"127.0.0.1",ADDR_LEN);
+				md->port=(int)client->evt;
+				push_device_event(ipc_->id,md);
+			}
+		}
+		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
+		global_idle_connect_id(id);
+		heap_free(ipc_->server->client_heap,client);
+	}
+	return 0;
 }
 
 int send_ipc(struct ipc *ipc_,void *msg,int flag){

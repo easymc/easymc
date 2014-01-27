@@ -37,6 +37,7 @@ struct ipc;
 
 struct ipc *create_ipc(unsigned int ip,unsigned short port,int id,unsigned short mode,int type);
 void delete_ipc(struct ipc *);
+int close_ipc(struct ipc *,int);
 int send_ipc(struct ipc *,void *msg,int flag);
 
 #ifdef __cplusplus

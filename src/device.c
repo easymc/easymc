@@ -40,8 +40,8 @@ struct device{
 	int					id;
 	// Device mode
 	ushort				mode;
-	// The device is monitoring events
-	uint				monitor;
+	// operation type device can accept
+	uint				operate;
 	struct ipc			*ipc_;
 	struct tcp			*tcp_;
 	//Message queue
@@ -76,9 +76,9 @@ int emc_device(void){
 	return id;
 }
 
-void emc_destory(int id){
+void emc_destory(int dev){
 	void *msg=NULL;
-	struct device *device_=(struct device *)global_get_device(id);
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(device_){
 		post_ringqueue(device_->mq);
 		post_ringqueue(device_->mmq);
@@ -99,51 +99,63 @@ void emc_destory(int id){
 		delete_ringqueue(device_->mmq);
 		free(device_);
 	}
-	global_erase_device(id);
+	global_erase_device(dev);
 }
 
- int emc_set(int id,int opt,void *optval,int optlen){
-	 struct device *device_=(struct device *)global_get_device(id);
+ int emc_set(int dev,int opt,void *optval,int optlen){
+	 int add=0;
+	 struct device *device_=(struct device *)global_get_device(dev);
 	 if(!device_){
 		 return -1;
 	 }
-	switch(opt){
-	case EMC_OPT_MONITOR:
-		if(sizeof(char)==optlen){
-			device_->monitor=*(uchar *)optval;
-		}else if(sizeof(short)==optlen){
-			device_->monitor=*(ushort *)optval;
-		}else if(sizeof(int)==optlen){
-			device_->monitor=*(uint *)optval;
-		}else if(sizeof(int64)==optlen){
-			device_->monitor=*(uint64 *)optval;
+	if(sizeof(char)==optlen){
+		add=*(char *)optval;
+	}else if(sizeof(short)==optlen){
+		add=*(short *)optval;
+	}else if(sizeof(int)==optlen){
+		add=*(int *)optval;
+	}else if(sizeof(int64)==optlen){
+		add=*(int64 *)optval;
+	}
+	if(add > 0){
+		if(opt & EMC_OPT_MONITOR){
+			device_->operate |= EMC_OPT_MONITOR;
 		}
-		break;
+		if(opt & EMC_OPT_CONTROL){
+			device_->operate |= EMC_OPT_CONTROL;
+		}
+	}else{
+		if(opt & EMC_OPT_MONITOR){
+			device_->operate &= ~EMC_OPT_MONITOR;
+		}
+		if(opt & EMC_OPT_CONTROL){
+			device_->operate &= ~EMC_OPT_CONTROL;
+		}
 	}
 	return 0;
 }
 
-int emc_bind(int id,const char *ip,const ushort port){
-	struct device *device_=(struct device *)global_get_device(id);
+int emc_bind(int dev,const char *ip,const ushort port){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
 	if(device_->ipc_ || device_->tcp_){
 		return -1;
 	}
-	device_->tcp_=create_tcp(ip?inet_addr(ip):0,port,id,EMC_NONE,EMC_LOCAL);
+	device_->tcp_=create_tcp(ip?inet_addr(ip):0,port,dev,EMC_NONE,EMC_LOCAL);
 	if(!device_->tcp_){
 		return -1;
 	}
-	device_->ipc_=create_ipc(ip?inet_addr(ip):0,port,id,EMC_NONE,EMC_LOCAL);
+	device_->ipc_=create_ipc(ip?inet_addr(ip):0,port,dev,EMC_NONE,EMC_LOCAL);
 	if(!device_->ipc_){
 		return -1;
 	}
 	return 0;
 }
 
-int emc_connect(int id,ushort mode,const char *ip,const ushort port){
-	struct device *device_=(struct device *)global_get_device(id);
+int emc_connect(int dev,ushort mode,const char *ip,const ushort port){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -154,12 +166,12 @@ int emc_connect(int id,ushort mode,const char *ip,const ushort port){
 	if(EMC_REP==mode)mode=EMC_REQ;
 	device_->mode=mode;
 	if(check_local_machine(inet_addr(ip))){
-		device_->ipc_=create_ipc(inet_addr(ip),port,id,mode,EMC_REMOTE);
+		device_->ipc_=create_ipc(inet_addr(ip),port,dev,mode,EMC_REMOTE);
 		if(!device_->ipc_){
 			return -1;
 		}
 	}else{
-		device_->tcp_=create_tcp(inet_addr(ip),port,id,mode,EMC_REMOTE);
+		device_->tcp_=create_tcp(inet_addr(ip),port,dev,mode,EMC_REMOTE);
 		if(!device_->tcp_){
 			delete_tcp(device_->tcp_);
 			device_->tcp_=NULL;
@@ -169,8 +181,30 @@ int emc_connect(int id,ushort mode,const char *ip,const ushort port){
 	return 0;
 }
 
-int emc_close(int id){
-	struct device *device_=(struct device *)global_get_device(id);
+int emc_control(int dev,int id,int ctl){
+	int result=-1;
+	struct device *device_=(struct device *)global_get_device(dev);
+	if(!device_){
+		return -1;
+	}
+	if(!(device_->operate & EMC_OPT_CONTROL)) return -1;
+	if(ctl & EMC_CTL_CLOSE){
+		if(device_->ipc_){
+			if(0==close_ipc(device_->ipc_,id)){
+				result=0;
+			}
+		}
+		if(device_->tcp_){
+			if(0==close_tcp(device_->tcp_,id)){
+				result=0;
+			}
+		}
+	}
+	return result;
+}
+
+int emc_close(int dev){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -183,9 +217,9 @@ int emc_close(int id){
 	return 0;
 }
 
-int emc_send(int id, void *msg,int flag){
+int emc_send(int dev, void *msg,int flag){
 	int result=-1;
-	struct device *device_=(struct device *)global_get_device(id);
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -202,8 +236,8 @@ int emc_send(int id, void *msg,int flag){
 	return result;
 }
 
-int emc_recv(int id,void **msg){
-	struct device *device_=(struct device *)global_get_device(id);
+int emc_recv(int dev,void **msg){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -218,9 +252,9 @@ int emc_recv(int id,void **msg){
 	return 0;
 }
 
-int emc_monitor(int id,struct monitor_data *data){
+int emc_monitor(int dev,struct monitor_data *data){
 	struct monitor_data *md=NULL;
-	struct device *device_=(struct device *)global_get_device(id);
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -241,16 +275,16 @@ int emc_monitor(int id,struct monitor_data *data){
 	return 0;
 }
 
-ushort get_device_mode(int id){
-	struct device *device_=(struct device *)global_get_device(id);
+ushort get_device_mode(int dev){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
 	return device_->mode;
 }
 
-int push_device_message(int id,void *msg){
-	struct device *device_=(struct device *)global_get_device(id);
+int push_device_message(int dev,void *msg){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -260,8 +294,8 @@ int push_device_message(int id,void *msg){
 	return 0;
 }
 
-int push_device_event(int id,void *data){
-	struct device *device_=(struct device *)global_get_device(id);
+int push_device_event(int dev,void *data){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return -1;
 	}
@@ -271,10 +305,19 @@ int push_device_event(int id,void *data){
 	return 0;
 }
 
-uint get_device_monitor(int id){
-	struct device *device_=(struct device *)global_get_device(id);
+
+uint get_device_monitor(int dev){
+	struct device *device_=(struct device *)global_get_device(dev);
 	if(!device_){
 		return 0;
 	}
-	return device_->monitor;
+	return (device_->operate & EMC_OPT_MONITOR);
+}
+
+uint get_device_control(int dev){
+	struct device *device_=(struct device *)global_get_device(dev);
+	if(!device_){
+		return 0;
+	}
+	return (device_->operate & EMC_OPT_CONTROL);
 }

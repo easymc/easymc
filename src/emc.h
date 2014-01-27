@@ -89,6 +89,7 @@ struct monitor_data{
 
 // easymc device operating parameters
 #define EMC_OPT_MONITOR			1	// Set the device to monitor events
+#define EMC_OPT_CONTROL			2	// Settings are available to control device
 
 // easymc events type
 #define EMC_EVENT_ACCEPT		1	// Service to accept a new connection
@@ -96,6 +97,9 @@ struct monitor_data{
 #define EMC_EVENT_CLOSED		4	// Client disconnects or service disconnected
 #define EMC_EVENT_SNDFAIL		8	// Send data failed
 #define EMC_EVENT_SNDSUCC		16	// Send data successful
+
+// easymc control type
+#define EMC_CTL_CLOSE			1	// Initiative to close the connection
 
 
 //emc send message flag
@@ -140,9 +144,14 @@ EMC_EXP void *emc_msg_buffer(void *msg);
 // Equipment operation function definition
 EMC_EXP int emc_device(void);
 EMC_EXP void emc_destory(int device_);
+// Set the device's option,optval value greater than 0 add option,otherwise reduce option
+// opt can be a combination of multiple option
 EMC_EXP int emc_set(int device_,int opt,void *optval,int optlen);
 EMC_EXP int emc_bind(int device_,const char *ip,const ushort port);
 EMC_EXP int emc_connect(int device_,ushort mode,const char *ip,const ushort port);
+// Control device,id is connected via monitor returns number.
+// By bind the device to be effective
+EMC_EXP int emc_control(int device_,int id,int ctl);
 EMC_EXP int emc_close(int device_);
 // After processing is complete message needs to call emc_msg_free() to release.
 EMC_EXP int emc_recv(int device_,void **msg);

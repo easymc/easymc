@@ -1099,6 +1099,15 @@ void delete_tcp(struct tcp *tcp_){
 	}
 }
 
+int close_tcp(struct tcp *tcp_,int id){
+	struct tcp_client *client=NULL;
+	if(!tcp_ || EMC_LOCAL!=tcp_->type) return -1;
+	if(!(client=(struct tcp_client *)hashmap_search(tcp_->server->connection,id))){
+		return -1;
+	}
+	return process_close(tcp_,client->area,id);
+}
+
 int send_tcp(struct tcp *tcp_,void *msg,int flag){
 	struct tcp_client *client=NULL;
 	if(!tcp_ || !msg){

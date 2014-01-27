@@ -84,7 +84,7 @@ int main(int argc, char* argv[]){
 	int device=emc_device();
 	pa.device=device;
 	pa.exit=0;
-	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
+	emc_set(device,EMC_OPT_MONITOR|EMC_OPT_CONTROL,&monitor,sizeof(int));
 	printf("Input a port to bind:");
 	scanf("%ld",&ch);
 	if(emc_bind(device,NULL,ch) < 0){
@@ -92,6 +92,15 @@ int main(int argc, char* argv[]){
 	}
 	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnMonitorDevice,(void *)&pa);
+	printf("Input C or c to close a connection\n");
+	while(1){
+		ch=getchar();
+		if('C'==ch || 'c'==ch){
+			printf("Input connection id:");
+			scanf("%ld",&ch);
+			emc_control(device,ch,EMC_CTL_CLOSE);
+		}
+	}
 	getchar();
 	getchar();
 	pa.exit=1;
