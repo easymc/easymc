@@ -438,7 +438,6 @@ static int process_close(struct tcp *tcp_,struct tcp_area *area,int id){
 	client->connected=0;
 #if !defined (EMC_WINDOWS)
 	tcp_del_event(tcp_,area,client->fd);
-	client->events=0;
 #endif
 	if(client->rupk){
 		global_free_unpack(client->rupk);
@@ -692,7 +691,6 @@ static int process_accept(struct tcp *tcp_,struct tcp_area *area,int fd,char *ad
 		tcp_del_event(tcp_,area,fd);
 		sockhash_erase(tcp_->hash,client->fd);
 		global_idle_connect_id(client->id);
-		client->events=0;
 		heap_free(tcp_->server->client_heap,client);
 		_close_socket(fd);
 		return -1;
