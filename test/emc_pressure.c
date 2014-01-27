@@ -86,41 +86,38 @@ int main(int argc, char* argv[]){
 	int ch=0;int device=-1;
 	char ip[16]={0};
 	char buffer[1024*7]={0};
-	int monitor=1;
+	int monitor=1,length=0,port=0;
 	void *msg=NULL;void *msg_=NULL;
 	struct para pa={0};
 
 	device=emc_device();
 	pa.device=device;
 	pa.exit=0;
-	printf("please input ip:");
+	printf("Input serve ip:");
 	scanf("%s",ip);
+	printf("Input server port:");
+	scanf("%ld",&port);
 	emc_thread(OnMonitorDevice,(void *)&pa);
 	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
-	emc_connect(device,EMC_REQ,ip,9001);
-	// 	while(1){
-	// 		emc_recv(device,msg_);
-	// 		printf("%s\n",emc_msg_buffer(msg));
-	// 	}
-	printf("please input mode(1-req,8-sub):");
-	scanf("%ld",&ch);
+	emc_connect(device,EMC_REQ,ip,port);
 	emc_thread(OnRecvMsg,(void *)&pa);
-	if(EMC_REQ==ch){
-		while(1){
-			ch=getchar();
-			if('S'==ch || 's'==ch){
-				msg=emc_msg_alloc(buffer,1024*7);
-				emc_msg_set_mode(msg,EMC_REQ);
-				if(emc_send(device,msg,0)==0){
-					send_count++;
-				}
-				emc_msg_free(msg);
-			}else if('Q'==ch || 'q'==ch){
-				pa.exit=1;
-				break;
-			}else if('P'==ch || 'p'==ch){
-				printf("send=%ld,recv=%ld\n",send_count,recv_count);
+	printf("Input send data length[Bytes]:");
+	scanf("%ld",&length);
+	while(1){
+		printf("Type S or s to send data and type Q or q to quit,type P or p to display the data length transceiver\n");
+		ch=getchar();
+		if('S'==ch || 's'==ch){
+			msg=emc_msg_alloc(buffer,length);
+			emc_msg_set_mode(msg,EMC_REQ);
+			if(emc_send(device,msg,0)==0){
+				send_count++;
 			}
+			emc_msg_free(msg);
+		}else if('Q'==ch || 'q'==ch){
+			pa.exit=1;
+			break;
+		}else if('P'==ch || 'p'==ch){
+			printf("send=%ld,recv=%ld\n",send_count,recv_count);
 		}
 	}
 // 	msg=emc_msg_alloc(buffer,1024*7);

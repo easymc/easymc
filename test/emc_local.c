@@ -42,7 +42,7 @@ static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	int device=pa->device;
 	while(!pa->exit){
 		if(0==emc_recv(device,(void **)&msg)){
-			printf("recv length=%ld\n",emc_msg_length(msg));
+//			printf("recv length=%ld\n",emc_msg_length(msg));
 			emc_msg_set_mode(msg,EMC_REQ);
 			emc_send(device,msg,0);
 			emc_msg_free(msg);
@@ -66,10 +66,10 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 				printf("client disconnected server,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_SNDSUCC:
-				printf("server send successful,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
+//				printf("server send successful,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_SNDFAIL:
-				printf("server send failed,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
+//				printf("server send failed,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
 				break;
 			}
 		}
@@ -80,16 +80,19 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 
 int main(int argc, char* argv[]){
 	struct para pa={0};
-	int monitor=1;
+	int monitor=1,ch=0;
 	int device=emc_device();
 	pa.device=device;
 	pa.exit=0;
 	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
-	if(emc_bind(device,NULL,9001) < 0){
+	printf("Input a port to bind:");
+	scanf("%ld",&ch);
+	if(emc_bind(device,NULL,ch) < 0){
 		printf("emc_bing fail\n");
 	}
 	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnMonitorDevice,(void *)&pa);
+	getchar();
 	getchar();
 	pa.exit=1;
 	emc_destory(device);

@@ -78,31 +78,31 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 int main(int argc, char* argv[]){
 	int ch=0;int device=-1;
 	char ip[16]={0};
-	char buffer[1024*7]={0};
-	int monitor=1;
+	int monitor=1,length=0,port=0;
 	void *msg=NULL;void *msg_=NULL;
 	struct para pa={0};
 
 	device=emc_device();
 	pa.device=device;
 	pa.exit=0;
-	printf("please input ip:");
+	printf("Input serve ip:");
 	scanf("%s",ip);
-//	emc_thread(OnMonitorDevice,(void *)&pa);
-//	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
-	emc_connect(device,EMC_REQ,ip,9001);
-// 	while(1){
-// 		emc_recv(device,msg_);
-// 		printf("%s\n",emc_msg_buffer(msg));
-// 	}
-	printf("please input mode(1-req,8-sub):");
+	printf("Input server port:");
+	scanf("%ld",&port);
+	emc_thread(OnMonitorDevice,(void *)&pa);
+	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
+	printf("Input mode(1-req,8-sub):");
 	scanf("%ld",&ch);
+	emc_connect(device,EMC_REQ,ip,port);
 	emc_thread(OnRecvMsg,(void *)&pa);
+	printf("Input send data length[Bytes]:");
+	scanf("%ld",&length);
 	if(EMC_REQ==ch){
+		printf("You choose REQREP mode,type S or s to send data and type Q or q to quit\n");
 		while(1){
 			ch=getchar();
 			if('S'==ch || 's'==ch){
-				msg=emc_msg_alloc(buffer,1024*7);
+				msg=emc_msg_alloc(NULL,length);
 				emc_msg_set_mode(msg,EMC_REQ);
 				emc_send(device,msg,0);
 			}else if('Q'==ch || 'q'==ch){
