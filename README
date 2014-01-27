@@ -15,10 +15,10 @@ Build it
 *********
 
 1.  Get the package.
-2.	Go to the root directory of the package.
-3.	mkdir build_gnc
-4.	cd build_gnc
-5.	run "cmake .."
+2.  Go to the root directory of the package.
+3.  mkdir build_gnc
+4.  cd build_gnc
+5.  run "cmake .."
 6.  make
 7.  make check
 8.  sudo make install
@@ -27,10 +27,10 @@ Build it on Windows
 ********************
 
 1.  Get the package.
-2.	Go to the root directory of the package.
-3.	md build_win
-4.	cd build_win
-5.	run "cmake .."
+2.  Go to the root directory of the package.
+3.  md build_win
+4.  cd build_win
+5.  run "cmake .."
 6.  Open the easymc.sln file using MSVC IDE.
 7.  Build the entire solution.
 
