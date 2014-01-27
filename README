@@ -1,0 +1,40 @@
+Welcome to easymc
+******************
+
+easymc is a simple message channel library that provides two 
+common communication patterns.Its job is to define how multiple 
+applications communicate.Supports two communications:
+1.	IPC:Shared Memory
+2.	TCP:Transmission Control Protocol
+
+The following two protocols are currently available:
+1.	REQREP:allow a question and answer approach to use requests
+2.	SUBPUB:distributes messages to large sets of interested subscribers 
+
+Build it
+*********
+
+1.  Get the package.
+2.	Go to the root directory of the package.
+3.	mkdir build_gnc
+4.	cd build_gnc
+5.	run "cmake .."
+6.  make
+7.  make check
+8.  sudo make install
+
+Build it on Windows
+********************
+
+1.  Get the package.
+2.	Go to the root directory of the package.
+3.	md build_win
+4.	cd build_win
+5.	run "cmake .."
+6.  Open the easymc.sln file using MSVC IDE.
+7.  Build the entire solution.
+
+Resources
+**********
+
+Source code: https://github.com/easymc/easymc
