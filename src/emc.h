@@ -99,7 +99,7 @@ struct monitor_data{
 #define EMC_EVENT_SNDSUCC		16	// Send data successful
 
 // easymc control type
-#define EMC_CTL_CLOSE			1	// Initiative to close the connection
+#define EMC_CTL_CLOSE			1	// Initiative to close the connection,by bind the device to be effective
 
 
 //emc send message flag
@@ -150,7 +150,6 @@ EMC_EXP int emc_set(int device_,int opt,void *optval,int optlen);
 EMC_EXP int emc_bind(int device_,const char *ip,const ushort port);
 EMC_EXP int emc_connect(int device_,ushort mode,const char *ip,const ushort port);
 // Control device,id is connected via monitor returns number.
-// By bind the device to be effective
 EMC_EXP int emc_control(int device_,int id,int ctl);
 EMC_EXP int emc_close(int device_);
 // After processing is complete message needs to call emc_msg_free() to release.
