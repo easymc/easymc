@@ -27,12 +27,13 @@ Build it on Windows
 ********************
 
 1.  Get the package.
-2.  Go to the root directory of the package.
-3.  md build_win
-4.  cd build_win
-5.  run "cmake .."
-6.  Open the easymc.sln file using MSVC IDE.
-7.  Build the entire solution.
+2.  run "cmake-gui"
+3.  Select the source and binaries directory
+4.  click "Configure"
+5.  click "Generate"
+6.  Go to the binaries directory
+7.  Open the easymc.sln file using MSVC IDE.
+8.  Build the entire solution.
 
 Resources
 **********
