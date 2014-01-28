@@ -33,7 +33,6 @@
 extern "C"{
 #endif
 
-	struct device;
 	ushort get_device_mode(int id);
 	// The device is monitoring events
 	uint get_device_monitor(int id);

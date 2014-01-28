@@ -143,20 +143,20 @@ EMC_EXP void *emc_msg_buffer(void *msg);
 
 // Equipment operation function definition
 EMC_EXP int emc_device(void);
-EMC_EXP void emc_destory(int device_);
+EMC_EXP void emc_destory(int device);
 // Set the device's option,optval value greater than 0 add option,otherwise reduce option
 // opt can be a combination of multiple option
-EMC_EXP int emc_set(int device_,int opt,void *optval,int optlen);
-EMC_EXP int emc_bind(int device_,const char *ip,const ushort port);
-EMC_EXP int emc_connect(int device_,ushort mode,const char *ip,const ushort port);
+EMC_EXP int emc_set(int device,int opt,void *optval,int optlen);
+EMC_EXP int emc_bind(int device,const char *ip,const ushort port);
+EMC_EXP int emc_connect(int device,ushort mode,const char *ip,const ushort port);
 // Control device,id is connected via monitor returns number.
-EMC_EXP int emc_control(int device_,int id,int ctl);
-EMC_EXP int emc_close(int device_);
+EMC_EXP int emc_control(int device,int id,int ctl);
+EMC_EXP int emc_close(int device);
 // After processing is complete message needs to call emc_msg_free() to release.
-EMC_EXP int emc_recv(int device_,void **msg);
-EMC_EXP int emc_send(int device_,void *msg,int flag);
+EMC_EXP int emc_recv(int device,void **msg);
+EMC_EXP int emc_send(int device,void *msg,int flag);
 // Monitoring event device
-EMC_EXP int emc_monitor(int device_,struct monitor_data *data);
+EMC_EXP int emc_monitor(int device,struct monitor_data *data);
 
 #ifdef __cplusplus
 }

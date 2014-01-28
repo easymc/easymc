@@ -93,7 +93,7 @@ struct ipc_data{
 
 struct ipc{
 	// Device ID
-	int					id;
+	int					device;
 	// IPC type: local / remote
 	int					type;
 
@@ -242,7 +242,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 						heap_free(ipc_->server->client_heap,client);
 					}
 				}
-				if(get_device_monitor(ipc_->id)){
+				if(get_device_monitor(ipc_->device)){
 					// If you set the monitor to throw on accept events
 					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 					if(md){
@@ -250,7 +250,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 						md->id=client->id;
 						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 						md->port=(int)client->evt;
-						push_device_event(ipc_->id,md);
+						push_device_event(ipc_->device,md);
 					}
 				}
 			}
@@ -263,7 +263,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 				global_idle_connect_id(ipc_->client->inid);
 				ipc_->client->inid=-1;
 			}
-			if(get_device_monitor(ipc_->id)){
+			if(get_device_monitor(ipc_->device)){
 				// If you set the monitor to throw on connect events
 				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 				if(md){
@@ -271,7 +271,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 					md->id=ipc_->client->id;
 					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->id,md);
+					push_device_event(ipc_->device,md);
 				}
 			}
 		}
@@ -287,7 +287,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 				close(client->evt);client->evt=-1;
 #endif
 				if(0==map_erase(ipc_->server->connection,id)){
-					if(get_device_monitor(ipc_->id)){
+					if(get_device_monitor(ipc_->device)){
 						// If you set the monitor to throw on disconnect events
 						struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 						if(md){
@@ -295,7 +295,7 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 							md->id=client->id;
 							strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 							md->port=(int)client->evt;
-							push_device_event(ipc_->id,md);
+							push_device_event(ipc_->device,md);
 						}
 					}
 					push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
@@ -320,11 +320,11 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 			ipc_->client->time=timeGetTime();
 			if(msg){
 				emc_msg_setid(msg,id);
-				emc_msg_set_mode(msg,get_device_mode(ipc_->id));
+				emc_msg_set_mode(msg,get_device_mode(ipc_->device));
 			}
 		}
 		if(msg){
-			if(push_device_message(ipc_->id,msg) < 0){
+			if(push_device_message(ipc_->device,msg) < 0){
 				emc_msg_free(msg);
 			}
 		}
@@ -405,14 +405,14 @@ static int reopen_ipc(struct ipc *ipc_){
 
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
-			if(get_device_monitor(ipc_->id)){
+			if(get_device_monitor(ipc_->device)){
 				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 				if(md){
 					md->events=EMC_EVENT_CLOSED;
 					md->id=ipc_->client->id;
 					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->id,md);
+					push_device_event(ipc_->device,md);
 				}
 			}
 			ipc_->client->id=-1;
@@ -450,14 +450,14 @@ static int reopen_ipc(struct ipc *ipc_){
 #else
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
-			if(get_device_monitor(ipc_->id)){
+			if(get_device_monitor(ipc_->device)){
 				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 				if(md){
 					md->events=EMC_EVENT_CLOSED;
 					md->id=ipc_->client->id;
 					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->id,md);
+					push_device_event(ipc_->device,md);
 				}
 			}
 			ipc_->client->id=-1;
@@ -674,7 +674,7 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 			if(write_ipc_data(ipc_,ipc_->client,ipc_->client->id,EMC_CMD_DATA,
 				(char *)emc_msg_buffer(msg),emc_msg_length(msg)) < 0){
 				// If you set the monitor to throw on send failure events
-				if(get_device_monitor(ipc_->id)){
+				if(get_device_monitor(ipc_->device)){
 					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 					if(md){
 						md->events=EMC_EVENT_SNDFAIL;
@@ -682,12 +682,12 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 						md->port=(int)ipc_->fd;
 						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->id,md);
+						push_device_event(ipc_->device,md);
 					}
 				}
 			}else{
 				// If you set the monitor to throw on send succress events
-				if(get_device_monitor(ipc_->id)){
+				if(get_device_monitor(ipc_->device)){
 					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 					if(md){
 						md->events=EMC_EVENT_SNDSUCC;
@@ -695,7 +695,7 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 						md->port=(int)ipc_->fd;
 						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->id,md);
+						push_device_event(ipc_->device,md);
 					}
 				}
 			}
@@ -709,7 +709,7 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 			if(write_ipc_data(ipc_,client,emc_msg_getid(msg),EMC_CMD_DATA,
 				(char *)emc_msg_buffer(msg),emc_msg_length(msg)) < 0){
 				// If you set the monitor to throw on send failure events
-				if(get_device_monitor(ipc_->id)){
+				if(get_device_monitor(ipc_->device)){
 					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 					if(md){
 						md->events=EMC_EVENT_SNDFAIL;
@@ -717,12 +717,12 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 						md->port=(int)client->evt;
 						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->id,md);
+						push_device_event(ipc_->device,md);
 					}
 				}
 			}else{
 				// If you set the monitor to throw on send success events
-				if(get_device_monitor(ipc_->id)){
+				if(get_device_monitor(ipc_->device)){
 					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 					if(md){
 						md->events=EMC_EVENT_SNDSUCC;
@@ -730,7 +730,7 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 						md->port=(int)client->evt;
 						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->id,md);
+						push_device_event(ipc_->device,md);
 					}
 				}
 			}
@@ -761,7 +761,7 @@ static uint map_foreach_check_cb(struct map *m,int64 key,void* p,void* addition)
 	timeout=timeGetTime()-timeout;
 	if(timeout > IPC_TIMEOUT){
 		if(timeGetTime()-client->time > IPC_TIMEOUT){
-			if(get_device_monitor(ipc_->id)){
+			if(get_device_monitor(ipc_->device)){
 				// If you set the monitor to throw on disconnect events
 				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 				if(md){
@@ -769,7 +769,7 @@ static uint map_foreach_check_cb(struct map *m,int64 key,void* p,void* addition)
 					md->id=client->id;
 					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 					md->port=(int)client->evt;
-					push_device_event(ipc_->id,md);
+					push_device_event(ipc_->device,md);
 				}
 			}
 #if defined (EMC_WINDOWS)
@@ -883,7 +883,7 @@ static emc_result_t EMC_CALL ipc_send_cb(void *args){
 				if(write_ipc_data(ipc_,client,client->id,EMC_CMD_DATA,(char *)emc_msg_buffer(data->msg),
 					emc_msg_length(data->msg)) < 0){
 						// If you set the monitor to throw on send failure events
-						if(get_device_monitor(ipc_->id)){
+						if(get_device_monitor(ipc_->device)){
 							struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 							if(md){
 								md->events=EMC_EVENT_SNDFAIL;
@@ -891,12 +891,12 @@ static emc_result_t EMC_CALL ipc_send_cb(void *args){
 								strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 								md->port=(int)client->evt;
 								md->addition=emc_msg_get_addition(data->msg);
-								push_device_event(ipc_->id,md);
+								push_device_event(ipc_->device,md);
 							}
 						}
 				}else{
 					// If you set the monitor to throw on send success events
-					if(get_device_monitor(ipc_->id)){
+					if(get_device_monitor(ipc_->device)){
 						struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 						if(md){
 							md->events=EMC_EVENT_SNDSUCC;
@@ -904,7 +904,7 @@ static emc_result_t EMC_CALL ipc_send_cb(void *args){
 							strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 							md->port=(int)client->evt;
 							md->addition=emc_msg_get_addition(data->msg);
-							push_device_event(ipc_->id,md);
+							push_device_event(ipc_->device,md);
 						}
 					}
 				}
@@ -1127,14 +1127,14 @@ static int init_ipc_client(struct ipc *ipc_){
 	return 0;
 }
 
-struct ipc *create_ipc(uint ip,ushort port,int id,unsigned short mode,int type){
+struct ipc *create_ipc(uint ip,ushort port,int device,unsigned short mode,int type){
 	struct ipc *ipc_=(struct ipc *)malloc(sizeof(struct ipc));
 	if(!ipc_)return NULL;
 	memset(ipc_,0,sizeof(struct ipc));
 	ipc_->ip=ip;
 	ipc_->port=port;
 	ipc_->type=type;
-	ipc_->id=id;
+	ipc_->device=device;
 	if(EMC_LOCAL==type){
 		ipc_->server=(struct ipc_server *)malloc(sizeof(struct ipc_server));
 		if(!ipc_->server){
@@ -1218,7 +1218,7 @@ int close_ipc(struct ipc * ipc_,int id){
 	close(client->evt);client->evt=-1;
 #endif
 	if(0==map_erase(ipc_->server->connection,id)){
-		if(get_device_monitor(ipc_->id)){
+		if(get_device_monitor(ipc_->device)){
 			// If you set the monitor to throw on disconnect events
 			struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 			if(md){
@@ -1226,7 +1226,7 @@ int close_ipc(struct ipc * ipc_,int id){
 				md->id=client->id;
 				strncpy(md->ip,"127.0.0.1",ADDR_LEN);
 				md->port=(int)client->evt;
-				push_device_event(ipc_->id,md);
+				push_device_event(ipc_->device,md);
 			}
 		}
 		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);

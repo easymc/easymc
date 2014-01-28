@@ -137,7 +137,7 @@ struct tcp_client{
 
 struct tcp{
 	// Device ID
-	int					id;
+	int					device;
 	// tcp type: local / remote
 	int					type;
 	//ip
@@ -305,7 +305,7 @@ static void tcp_release_msg(struct tcp_data *data){
 // Throws monitoring messages
 static void tcp_post_monitor(struct tcp *tcp_,struct tcp_client *client,int evt,void *msg){
 	// If you set the monitor option throws up message
-	if(get_device_monitor(tcp_->id)){
+	if(get_device_monitor(tcp_->device)){
 		struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
 		if(md){
 			md->events=evt;
@@ -317,7 +317,7 @@ static void tcp_post_monitor(struct tcp *tcp_,struct tcp_client *client,int evt,
 			if(msg){
 				md->addition=emc_msg_get_addition(msg);
 			}
-			push_device_event(tcp_->id,md);
+			push_device_event(tcp_->device,md);
 		}
 	}
 }
@@ -336,7 +336,7 @@ static void tcp_merger_cb(char* data,int len,int id,void* addition){
 	if(client && msg){
 		emc_msg_setid(msg,id);
 		emc_msg_set_mode(msg,client->mode);
-		if(push_device_message(tcp_->id,msg) < 0){
+		if(push_device_message(tcp_->device,msg) < 0){
 			emc_msg_free(msg);
 		}
 	}
@@ -361,7 +361,7 @@ static void tcp_unpack_cb(char* data,unsigned short len,int id,void* args){
 				if(msg){
 					emc_msg_setid(msg,id);
 					emc_msg_set_mode(msg,client->mode);
-					if(push_device_message(area->tcp_->id,msg) < 0){
+					if(push_device_message(area->tcp_->device,msg) < 0){
 						emc_msg_free(msg);
 					}
 				}
@@ -981,11 +981,11 @@ static int init_tcp_client(struct tcp *tcp_){
 	return 0;
 }
 
-struct tcp *create_tcp(unsigned int ip,unsigned short port,int id,unsigned short mode,int type){
+struct tcp *create_tcp(unsigned int ip,unsigned short port,int device,unsigned short mode,int type){
 	struct tcp *tcp_=(struct tcp *)malloc(sizeof(struct tcp));
 	if(!tcp_)return NULL;
 	memset(tcp_,0,sizeof(struct tcp));
-	tcp_->id=id;
+	tcp_->device=device;
 	tcp_->ip=ip;
 	tcp_->port=port;
 	tcp_->type=type;

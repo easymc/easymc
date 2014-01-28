@@ -34,7 +34,7 @@ extern "C"{
 #endif
 
 struct tcp;
-struct tcp *create_tcp(unsigned int ip,unsigned short port,int id,unsigned short mode,int type);
+struct tcp *create_tcp(unsigned int ip,unsigned short port,int device,unsigned short mode,int type);
 void delete_tcp(struct tcp *);
 int close_tcp(struct tcp *,int);
 int send_tcp(struct tcp *,void *,int);
