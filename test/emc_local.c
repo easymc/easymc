@@ -92,13 +92,15 @@ int main(int argc, char* argv[]){
 	}
 	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnMonitorDevice,(void *)&pa);
-	printf("Input C or c to close a connection\n");
+	printf("Input C or c to close a connection,Q or q to exit\n");
 	while(1){
 		ch=getchar();
 		if('C'==ch || 'c'==ch){
 			printf("Input connection id:");
 			scanf("%ld",&ch);
 			emc_control(device,ch,EMC_CTL_CLOSE);
+		}else if('Q'==ch || 'q'==ch){
+			break;
 		}
 	}
 	getchar();

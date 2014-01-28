@@ -121,7 +121,7 @@ int pop_uqueue(struct uniquequeue* uq){
 }
 
 int wait_uqueue(struct uniquequeue* uq){
-	return wait_event(uq->wait,1);
+	return wait_event(uq->wait,-1);
 }
 
 void post_uqueue(struct uniquequeue* uq){

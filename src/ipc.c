@@ -873,7 +873,7 @@ static emc_result_t EMC_CALL ipc_send_cb(void *args){
 	struct ipc_client *client=NULL;
 	while(!ipc_->exit){
 		wait_ringqueue(ipc_->sq);
-		if(0==pop_ringqueue_multiple(ipc_->sq,(void **)&data)){
+		while(0==pop_ringqueue_multiple(ipc_->sq,(void **)&data)){
 			if(EMC_LOCAL==ipc_->type){
 				map_get(ipc_->server->connection,data->id,(void **)&client);
 			}else if(EMC_REMOTE==ipc_->type){

@@ -169,7 +169,7 @@ int get_single_consumer(struct ringqueue *rb){
 }
 
 int wait_ringqueue(struct ringqueue *rb){
-	return wait_event(rb->wait,1);
+	return wait_event(rb->wait,-1);
 }
 
 int post_ringqueue(struct ringqueue *rb){
