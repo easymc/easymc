@@ -37,12 +37,8 @@ extern "C"{
 
 //get message struct size
 int emc_msg_struct_size();
-// Get the message type
-unsigned short emc_msg_get_mode(void *msg_);
-// Get the client id from message
-int emc_msg_getid(void *msg_);
-// SSet to send or receive this message client id
-void emc_msg_setid(void *msg_,int id);
+// Get the message additional data
+void *emc_msg_get_addition(void *msg);
 // Analyzing the message reference count is 0
 int emc_msg_zero_ref(void *msg);
 // Message reference count is incremented

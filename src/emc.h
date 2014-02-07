@@ -102,7 +102,7 @@ struct monitor_data{
 #define EMC_CTL_CLOSE			1	// Initiative to close the connection,by bind the device to be effective
 
 
-//emc send message flag
+// emc send message flag
 #define EMC_NOWAIT	1
 
 //  Compilation symbols control
@@ -129,10 +129,14 @@ EMC_EXP void *emc_msg_alloc(void *data,uint size);
 EMC_EXP void emc_msg_build(void *msg,const void *old);
 // Set the message mode
 EMC_EXP void emc_msg_set_mode(void *msg,ushort mode);
+// Get the message type
+EMC_EXP ushort emc_msg_get_mode(void *msg);
+// Get the client id from message
+EMC_EXP int emc_msg_getid(void *msg);
+// Set to send or receive this message client id
+EMC_EXP void emc_msg_setid(void *msg,int id);
 // Set the message additional data.[Returns additional data by monitoring SNDSUCC/SNDFAIL events]
 EMC_EXP void emc_msg_set_addition(void *msg,void *addition);
-// Get the message additional data
-EMC_EXP void *emc_msg_get_addition(void *msg);
 // Get the message length
 EMC_EXP int emc_msg_length(void *msg);
 // Free the messsage
