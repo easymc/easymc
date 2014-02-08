@@ -165,7 +165,7 @@ int emc_connect(int device,ushort mode,const char *ip,const ushort port){
 	if(EMC_PUB==mode)mode=EMC_SUB;
 	if(EMC_REP==mode)mode=EMC_REQ;
 	ed->mode=mode;
-	if(check_local_machine(inet_addr(ip))){
+	if(!ip || check_local_machine(inet_addr(ip))){
 		ed->ipc_=create_ipc(inet_addr(ip),port,device,mode,EMC_REMOTE);
 		if(!ed->ipc_){
 			return -1;
