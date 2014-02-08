@@ -48,6 +48,8 @@ struct message{
 	volatile uint	ref;
 	// Whether it is deleted
 	volatile uint	del;
+	// Operating results
+	volatile uint	result;
 	// Additional data, when the monitor is used to return to the upper application
 	void			*addition;
 };
@@ -72,6 +74,7 @@ void *emc_msg_alloc(void *data,uint size){
 	msg_->flag=EMC_LIVE;
 	msg_->serial=global_get_data_serial();
 	msg_->id=-1;
+	msg_->result=0;
 	msg_->len=size;
 	if(data && size){
 		memcpy(msg_+1,data,size);
@@ -189,4 +192,20 @@ int emc_msg_serial(void *msg){
 
 int emc_msg_struct_size(){
 	return sizeof(struct message);
+}
+
+int emc_msg_set_result(void *msg,uint result){
+	if(!msg_check_live(msg)){
+		return -1;
+	}
+	((struct message *)msg)->result=result;
+	return 0;
+}
+
+int emc_msg_get_result(void *msg,uint *result){
+	if(!msg_check_live(msg)){
+		return -1;
+	}
+	*result=((struct message *)msg)->result;
+	return 0;
 }

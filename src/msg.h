@@ -47,7 +47,10 @@ int emc_msg_ref_add(void *msg);
 int emc_msg_ref_dec(void *msg);
 // Gets the message sequence number
 int emc_msg_serial(void *msg);
-
+// Set the message operating result
+int emc_msg_set_result(void *msg,unsigned int result);
+// Get the message operating result
+int emc_msg_get_result(void *msg,unsigned int *result);
 
 #ifdef __cplusplus
 }

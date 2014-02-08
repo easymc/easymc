@@ -129,7 +129,7 @@ EMC_EXP void *emc_msg_alloc(void *data,uint size);
 EMC_EXP void emc_msg_build(void *msg,const void *old);
 // Set the message mode
 EMC_EXP void emc_msg_set_mode(void *msg,ushort mode);
-// Get the message type
+// Get the message mode
 EMC_EXP ushort emc_msg_get_mode(void *msg);
 // Get the client id from message
 EMC_EXP int emc_msg_getid(void *msg);
@@ -159,7 +159,7 @@ EMC_EXP int emc_close(int device);
 // After processing is complete message needs to call emc_msg_free() to release.
 EMC_EXP int emc_recv(int device,void **msg);
 EMC_EXP int emc_send(int device,void *msg,int flag);
-// Monitoring event device
+// Monitoring the device event
 EMC_EXP int emc_monitor(int device,struct monitor_data *data);
 
 #ifdef __cplusplus

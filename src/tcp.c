@@ -629,6 +629,7 @@ static int process_send(struct tcp *tcp_,struct tcp_area *area,int id){
 		if(EMC_CMD_DATA==data->cmd){
 			tcp_post_monitor(tcp_,client,EMC_EVENT_SNDSUCC,data->msg);
 		}
+		emc_msg_set_result(data->msg,1);
 		emc_msg_ref_dec(data->msg);
 		tcp_release_msg(data);
 	}
@@ -1160,11 +1161,17 @@ int send_tcp(struct tcp *tcp_,void *msg,int flag){
 				return -1;
 			}
 		}else{
+			uint result=0;
 			if(tcp_send_data(tcp_,client,EMC_CMD_DATA,flag,msg) < 0){
 				tcp_post_monitor(tcp_,client,EMC_EVENT_SNDFAIL,msg);
 				return -1;
 			}
 			while(client->connected && 0==emc_msg_zero_ref(msg)){}
+			if(emc_msg_get_result(msg,&result) < 0){
+				return -1;
+			}
+			if(result) return 0;
+			if(!client->connected) return -1;
 		}
 		break;
 	case EMC_PUB:
