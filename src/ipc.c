@@ -402,7 +402,6 @@ static int reopen_ipc(struct ipc *ipc_){
 	if(EMC_REMOTE==ipc_->type){
 #if defined (EMC_WINDOWS)
 		char name[PATH_LEN]={0};
-
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
 			if(get_device_monitor(ipc_->device)){
@@ -434,6 +433,22 @@ static int reopen_ipc(struct ipc *ipc_){
 				ipc_->fd=NULL;
 				return -1;
 			}
+			ipc_->client->locate=-1;
+			if(pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate) < 0){
+				UnmapViewOfFile(ipc_->buffer);
+				CloseHandle(ipc_->fd);
+				ipc_->buffer=NULL;
+				ipc_->fd=NULL;
+				return -1;
+			}
+			if(ipc_->client->locate < 0){
+				UnmapViewOfFile(ipc_->buffer);
+				CloseHandle(ipc_->fd);
+				ipc_->buffer=NULL;
+				ipc_->fd=NULL;
+				return -1;
+			}
+			printf("locate=%ld\n",ipc_->client->locate);
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 		}
 		sprintf_s(name,PATH_LEN,"event_%ld",ipc_->port);
@@ -478,6 +493,24 @@ static int reopen_ipc(struct ipc *ipc_){
 				ipc_->fd=-1;
 				return -1;
 			}
+			ipc_->client->locate=-1;
+			if(pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate) < 0){
+				shmdt(ipc_->buffer);
+				ipc_->buffer=NULL;
+				close(ipc_->fd);
+				semctl(ipc_->evt,IPC_RMID,NULL);
+				ipc_->fd=-1;
+				return -1;
+			}
+			if(ipc_->client->locate < 0){
+				shmdt(ipc_->buffer);
+				ipc_->buffer=NULL;
+				close(ipc_->fd);
+				semctl(ipc_->evt,IPC_RMID,NULL);
+				ipc_->fd=-1;
+				return -1;
+			}
+			printf("locate=%ld\n",ipc_->client->locate);
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 		}
 		ipc_->client->evt=semget(ipc_->port+0xFFFF,0,IPC_CREAT|0600);
@@ -1036,7 +1069,13 @@ static int init_ipc_client(struct ipc *ipc_){
 		}
 
 		ipc_->client->locate=-1;
-		pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate);
+		if(pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate) < 0){
+			UnmapViewOfFile(ipc_->buffer);
+			CloseHandle(ipc_->fd);
+			ipc_->buffer=NULL;
+			ipc_->fd=NULL;
+			return -1;
+		}
 		if(ipc_->client->locate < 0){
 			UnmapViewOfFile(ipc_->buffer);
 			CloseHandle(ipc_->fd);
@@ -1085,7 +1124,14 @@ static int init_ipc_client(struct ipc *ipc_){
 			return -1;
 		}
 		ipc_->client->locate=-1;
-		pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate);
+		if(pop_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),(void *)&ipc_->client->locate) < 0){
+			shmdt(ipc_->buffer);
+			ipc_->buffer=NULL;
+			close(ipc_->fd);
+			semctl(ipc_->evt,IPC_RMID,NULL);
+			ipc_->fd=-1;
+			return -1;
+		}
 		if(ipc_->client->locate < 0){
 			shmdt(ipc_->buffer);
 			ipc_->buffer=NULL;
