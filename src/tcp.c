@@ -869,8 +869,12 @@ static void tcp_send_login(struct tcp *tcp_){
 
 // Tcp client initialization
 static int init_tcp_client(struct tcp *tcp_){
+#if defined (EMC_WINDOWS)
 	fd_set rdset={0},wdset={0};
 	struct timeval tv={0};
+#else
+	struct pollfd fds;
+#endif
 	struct sockaddr_in	addr={0};
 	int size=0x10000,flag=1,erro=0,erro_len=sizeof(int),selecttime=5;
 
@@ -925,6 +929,7 @@ static int init_tcp_client(struct tcp *tcp_){
 		}
 	}
 	while(1){
+#if defined (EMC_WINDOWS)
 		FD_ZERO(&wdset);
 		FD_ZERO(&rdset);
 		FD_SET(tcp_->client->fd,&wdset);
@@ -957,6 +962,24 @@ static int init_tcp_client(struct tcp *tcp_){
 			tcp_->client->connected=1;
 			break;
 		}
+#else
+		fds.fd=tcp_->client->fd;
+		fds.events |= POLLOUT;
+		if(poll(&fds,1,100) > 0){
+			if(fds.revents & POLLOUT){
+				if(getsockopt(tcp_->client->fd,SOL_SOCKET,SO_ERROR,(char*)&erro,&erro_len) < 0){
+					_close_socket(tcp_->client->fd);
+					return -1;
+				}
+				if(0!=erro){
+					_close_socket(tcp_->client->fd);
+					return -1;
+				}
+				tcp_->client->connected=1;
+				break;
+			}
+		}
+#endif
 		selecttime--;
 		if(!selecttime){
 			tcp_->client->connected=0;
