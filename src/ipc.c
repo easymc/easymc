@@ -177,6 +177,26 @@ static int ipc_send_register_bc(struct ipc *ipc_,struct ipc_client *client){
 	return write_ipc_data(ipc_,client,client->id,EMC_CMD_LOGIN,NULL,0);
 }
 
+// Throws monitoring messages
+static void ipc_post_monitor(struct ipc *ipc_,struct ipc_client *client,int port,int evt,void *msg){
+	// If you set the monitor option throws up message
+	if(get_device_monitor(ipc_->device)){
+		struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
+		if(md){
+			md->events=evt;
+			if(client){
+				md->id=client->id;
+				strncpy(md->ip,"127.0.0.1",ADDR_LEN);
+				md->port=port;
+			}
+			if(msg){
+				md->addition=emc_msg_get_addition(msg);
+			}
+			push_device_event(ipc_->device,md);
+		}
+	}
+}
+
 // Processing of data packets received
 static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int len){
 	struct ipc_client *client=NULL;
@@ -242,17 +262,8 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 						heap_free(ipc_->server->client_heap,client);
 					}
 				}
-				if(get_device_monitor(ipc_->device)){
-					// If you set the monitor to throw on accept events
-					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-					if(md){
-						md->events=EMC_EVENT_ACCEPT;
-						md->id=client->id;
-						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-						md->port=(int)client->evt;
-						push_device_event(ipc_->device,md);
-					}
-				}
+				// If you set the monitor to throw on accept events
+				ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_ACCEPT,NULL);
 			}
 		}else if(EMC_REMOTE==ipc_->type){
 			// Processing ipc server response id number
@@ -263,17 +274,8 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 				global_idle_connect_id(ipc_->client->inid);
 				ipc_->client->inid=-1;
 			}
-			if(get_device_monitor(ipc_->device)){
-				// If you set the monitor to throw on connect events
-				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-				if(md){
-					md->events=EMC_EVENT_CONNECT;
-					md->id=ipc_->client->id;
-					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->device,md);
-				}
-			}
+			// If you set the monitor to throw on connect events
+			ipc_post_monitor(ipc_,ipc_->client,(int)ipc_->fd,EMC_EVENT_CONNECT,NULL);
 		}
 	}else if(EMC_CMD_LOGOUT==cmd){
 		if(EMC_LOCAL==ipc_->type){
@@ -287,17 +289,8 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 				close(client->evt);client->evt=-1;
 #endif
 				if(0==map_erase(ipc_->server->connection,id)){
-					if(get_device_monitor(ipc_->device)){
-						// If you set the monitor to throw on disconnect events
-						struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-						if(md){
-							md->events=EMC_EVENT_CLOSED;
-							md->id=client->id;
-							strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-							md->port=(int)client->evt;
-							push_device_event(ipc_->device,md);
-						}
-					}
+					// If you set the monitor to throw on disconnect events
+					ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 					push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
 					global_idle_connect_id(id);
 					heap_free(ipc_->server->client_heap,client);
@@ -404,16 +397,7 @@ static int reopen_ipc(struct ipc *ipc_){
 		char name[PATH_LEN]={0};
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
-			if(get_device_monitor(ipc_->device)){
-				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-				if(md){
-					md->events=EMC_EVENT_CLOSED;
-					md->id=ipc_->client->id;
-					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->device,md);
-				}
-			}
+			ipc_post_monitor(ipc_,ipc_->client,(int)ipc_->fd,EMC_EVENT_CLOSED,NULL);
 			ipc_->client->id=-1;
 		}
 		ipc_->client->connected=0;
@@ -465,16 +449,7 @@ static int reopen_ipc(struct ipc *ipc_){
 #else
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
-			if(get_device_monitor(ipc_->device)){
-				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-				if(md){
-					md->events=EMC_EVENT_CLOSED;
-					md->id=ipc_->client->id;
-					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-					md->port=(int)ipc_->fd;
-					push_device_event(ipc_->device,md);
-				}
-			}
+			ipc_post_monitor(ipc_,ipc_->client,(int)ipc_->fd,EMC_EVENT_CLOSED,NULL);
 			ipc_->client->id=-1;
 		}
 		ipc_->client->connected=0;
@@ -707,30 +682,10 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 			if(write_ipc_data(ipc_,ipc_->client,ipc_->client->id,EMC_CMD_DATA,
 				(char *)emc_msg_buffer(msg),emc_msg_length(msg)) < 0){
 				// If you set the monitor to throw on send failure events
-				if(get_device_monitor(ipc_->device)){
-					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-					if(md){
-						md->events=EMC_EVENT_SNDFAIL;
-						md->id=ipc_->client->id;
-						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-						md->port=(int)ipc_->fd;
-						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->device,md);
-					}
-				}
+				ipc_post_monitor(ipc_,ipc_->client,(int)ipc_->fd,EMC_EVENT_SNDFAIL,msg);
 			}else{
 				// If you set the monitor to throw on send succress events
-				if(get_device_monitor(ipc_->device)){
-					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-					if(md){
-						md->events=EMC_EVENT_SNDSUCC;
-						md->id=ipc_->client->id;
-						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-						md->port=(int)ipc_->fd;
-						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->device,md);
-					}
-				}
+				ipc_post_monitor(ipc_,ipc_->client,(int)ipc_->fd,EMC_EVENT_SNDSUCC,msg);
 			}
 		}
 		break;
@@ -742,30 +697,10 @@ static int write_ipc(struct ipc *ipc_,void *msg,int flag){
 			if(write_ipc_data(ipc_,client,emc_msg_getid(msg),EMC_CMD_DATA,
 				(char *)emc_msg_buffer(msg),emc_msg_length(msg)) < 0){
 				// If you set the monitor to throw on send failure events
-				if(get_device_monitor(ipc_->device)){
-					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-					if(md){
-						md->events=EMC_EVENT_SNDFAIL;
-						md->id=client->id;
-						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-						md->port=(int)client->evt;
-						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->device,md);
-					}
-				}
+				ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_SNDFAIL,msg);
 			}else{
 				// If you set the monitor to throw on send success events
-				if(get_device_monitor(ipc_->device)){
-					struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-					if(md){
-						md->events=EMC_EVENT_SNDSUCC;
-						md->id=client->id;
-						strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-						md->port=(int)client->evt;
-						md->addition=emc_msg_get_addition(msg);
-						push_device_event(ipc_->device,md);
-					}
-				}
+				ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_SNDSUCC,msg);
 			}
 		}
 		break;
@@ -794,17 +729,8 @@ static uint map_foreach_check_cb(struct map *m,int64 key,void* p,void* addition)
 	timeout=timeGetTime()-timeout;
 	if(timeout > IPC_TIMEOUT){
 		if(timeGetTime()-client->time > IPC_TIMEOUT){
-			if(get_device_monitor(ipc_->device)){
-				// If you set the monitor to throw on disconnect events
-				struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-				if(md){
-					md->events=EMC_EVENT_CLOSED;
-					md->id=client->id;
-					strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-					md->port=(int)client->evt;
-					push_device_event(ipc_->device,md);
-				}
-			}
+			// If you set the monitor to throw on disconnect events
+			ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 #if defined (EMC_WINDOWS)
 			CloseHandle(client->evt);client->evt=NULL;
 #else
@@ -915,31 +841,11 @@ static emc_result_t EMC_CALL ipc_send_cb(void *args){
 			if(client){
 				if(write_ipc_data(ipc_,client,client->id,EMC_CMD_DATA,(char *)emc_msg_buffer(data->msg),
 					emc_msg_length(data->msg)) < 0){
-						// If you set the monitor to throw on send failure events
-						if(get_device_monitor(ipc_->device)){
-							struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-							if(md){
-								md->events=EMC_EVENT_SNDFAIL;
-								md->id=client->id;
-								strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-								md->port=(int)client->evt;
-								md->addition=emc_msg_get_addition(data->msg);
-								push_device_event(ipc_->device,md);
-							}
-						}
+					// If you set the monitor to throw on send failure events
+					ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_SNDFAIL,data->msg);
 				}else{
 					// If you set the monitor to throw on send success events
-					if(get_device_monitor(ipc_->device)){
-						struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-						if(md){
-							md->events=EMC_EVENT_SNDSUCC;
-							md->id=client->id;
-							strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-							md->port=(int)client->evt;
-							md->addition=emc_msg_get_addition(data->msg);
-							push_device_event(ipc_->device,md);
-						}
-					}
+					ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_SNDSUCC,data->msg);
 				}
 			}
 			emc_msg_ref_dec(data->msg);
@@ -1264,17 +1170,8 @@ int close_ipc(struct ipc * ipc_,int id){
 	close(client->evt);client->evt=-1;
 #endif
 	if(0==map_erase(ipc_->server->connection,id)){
-		if(get_device_monitor(ipc_->device)){
-			// If you set the monitor to throw on disconnect events
-			struct monitor_data *md=(struct monitor_data *)global_alloc_monitor();
-			if(md){
-				md->events=EMC_EVENT_CLOSED;
-				md->id=client->id;
-				strncpy(md->ip,"127.0.0.1",ADDR_LEN);
-				md->port=(int)client->evt;
-				push_device_event(ipc_->device,md);
-			}
-		}
+		// If you set the monitor to throw on disconnect events
+		ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
 		global_idle_connect_id(id);
 		heap_free(ipc_->server->client_heap,client);
