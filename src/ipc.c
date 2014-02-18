@@ -281,6 +281,8 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 		if(EMC_LOCAL==ipc_->type){
 			if(0==map_get(ipc_->server->connection,id,(void **)&client)){
 				client->connected=0;
+				// If you set the monitor to throw on disconnect events
+				ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 #if defined (EMC_WINDOWS)
 				if(client->evt){
 					CloseHandle(client->evt);client->evt=NULL;
@@ -289,8 +291,6 @@ static void ipc_complete_data(struct ipc *ipc_,int id,ushort cmd,char *data,int 
 				close(client->evt);client->evt=-1;
 #endif
 				if(0==map_erase(ipc_->server->connection,id)){
-					// If you set the monitor to throw on disconnect events
-					ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 					push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
 					global_idle_connect_id(id);
 					heap_free(ipc_->server->client_heap,client);
