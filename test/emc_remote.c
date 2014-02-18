@@ -39,11 +39,11 @@ struct para{
 static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	struct para *pa=(struct para *)p;
 	int device=pa->device;
-	void *msg_=NULL;
+	void *msg=NULL;
 	while(!pa->exit){
-		if(0==emc_recv(device,(void **)&msg_)){
-			printf("recv length=%ld\n",emc_msg_length(msg_));
-			emc_msg_free(msg_);
+		if(0==emc_recv(device,(void **)&msg)){
+			printf("recv length=%ld\n",emc_msg_length(msg));
+			emc_msg_free(msg);
 		}
 	}
 	return 0;
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]){
 	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
 	printf("Input mode(1-req,8-sub):");
 	scanf("%ld",&ch);
-	emc_connect(device,EMC_REQ,ip,port);
+	emc_connect(device,ch,ip,port);
 	emc_thread(OnRecvMsg,(void *)&pa);
 	printf("Input send data length[Bytes]:");
 	scanf("%ld",&length);
@@ -105,6 +105,21 @@ int main(int argc, char* argv[]){
 				msg=emc_msg_alloc(NULL,length);
 				emc_msg_set_mode(msg,EMC_REQ);
 				emc_send(device,msg,0);
+				emc_msg_free(msg);
+			}else if('Q'==ch || 'q'==ch){
+				pa.exit=1;
+				break;
+			}
+		}
+	}else if(EMC_SUB==ch){
+		printf("You choose PUBSUB mode,type S or s to send data and type Q or q to quit\n");
+		while(1){
+			ch=getchar();
+			if('S'==ch || 's'==ch){
+				msg=emc_msg_alloc(NULL,length);
+				emc_msg_set_mode(msg,EMC_SUB);
+				emc_send(device,msg,0);
+				emc_msg_free(msg);
 			}else if('Q'==ch || 'q'==ch){
 				pa.exit=1;
 				break;

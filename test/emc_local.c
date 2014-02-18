@@ -43,7 +43,11 @@ static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	while(!pa->exit){
 		if(0==emc_recv(device,(void **)&msg)){
 //			printf("recv length=%ld\n",emc_msg_length(msg));
-			emc_msg_set_mode(msg,EMC_REQ);
+			if(EMC_SUB==emc_msg_get_mode(msg)){
+				emc_msg_set_mode(msg,EMC_PUB);
+			}else if(EMC_REQ==emc_msg_get_mode(msg)){
+				emc_msg_set_mode(msg,EMC_REP);
+			}
 			emc_send(device,msg,0);
 			emc_msg_free(msg);
 		}
