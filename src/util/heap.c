@@ -152,8 +152,12 @@ int heap_free(struct heap *hp,void* buf){
 	return 0;
 }
 
-int stack_size(struct heap *hp){
-	return hp->used;
+int heap_size(struct heap *hp){
+	int size=0;
+	_lock_heap(hp);
+	size=hp->used;
+	_unlock_heap(hp);
+	return size;
 }
 
 void heap_reset(struct heap *hp){
