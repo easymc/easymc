@@ -236,7 +236,6 @@ static int tcp_add_event(struct tcp_area *area,struct tcp_client *client,uint ma
 		client->olr.mask=EMC_READ;
 		if(WSARecv(client->fd,&client->olr.buf,1,&length,&flag,&client->olr.ol,NULL) < 0){
 			if(WSA_IO_PENDING!=GetLastError()){
-				printf("WSARecv error=%ld\n",GetLastError());
 				return -1;
 			}
 		}
@@ -262,7 +261,6 @@ static int tcp_set_event(struct tcp_area *area,struct tcp_client *client,uint ma
 		client->olr.mask=EMC_READ;
 		if(WSARecv(client->fd,&client->olr.buf,1,&length,&flag,&client->olr.ol,NULL) < 0){
 			if(WSA_IO_PENDING!=GetLastError()){
-				printf("WSARecv error=%ld\n",GetLastError());
 				return -1;
 			}
 		}

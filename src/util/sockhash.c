@@ -197,16 +197,3 @@ void sockhash_erase(struct sockhash *m , int fd)
 	}
 	unlock_hash(m);
 }
-
-void sockhash_dump(struct sockhash *m) {
-	int i;
-	for (i=0;i<m->size;i++)
-	{
-		struct node * n = m->hash[i];
-		while(n)
-		{
-			printf("[%d] fd = %d , id = %d\r\n",i,n->fd,n->id);
-			n = n->next;
-		}
-	}
-}

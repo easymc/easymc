@@ -44,7 +44,6 @@ void sockhash_delete(struct sockhash *);
 int sockhash_search(struct sockhash * , int fd);
 int sockhash_insert(struct sockhash * , int fd, int id);
 void sockhash_erase(struct sockhash *, int fd);
-void sockhash_dump(struct sockhash *m);
 
 #ifdef __cplusplus
 }

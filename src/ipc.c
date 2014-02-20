@@ -432,7 +432,6 @@ static int reopen_ipc(struct ipc *ipc_){
 				ipc_->fd=NULL;
 				return -1;
 			}
-			printf("locate=%ld\n",ipc_->client->locate);
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 		}
 		sprintf_s(name,PATH_LEN,"event_%ld",ipc_->port);
@@ -440,7 +439,6 @@ static int reopen_ipc(struct ipc *ipc_){
 		if(!ipc_->client->evt){
 			return -1;
 		}
-		printf("locate=%ld\n",ipc_->client->locate);
 		if(ipc_->buffer){
 			*(uint *)ipc_->buffer=timeGetTime();
 		}
@@ -485,7 +483,6 @@ static int reopen_ipc(struct ipc *ipc_){
 				ipc_->fd=-1;
 				return -1;
 			}
-			printf("locate=%ld\n",ipc_->client->locate);
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 		}
 		ipc_->client->evt=semget(ipc_->port+0xFFFF,0,IPC_CREAT|0600);
@@ -892,7 +889,6 @@ static int init_ipc_server(struct ipc *ipc_){
 	sprintf_s(name,PATH_LEN,"event_%ld",ipc_->port);
 	ipc_->evt=CreateSemaphore(NULL,0,1,name);
 	if(!ipc_->evt){
-		printf("%ld\n",GetLastError());
 		CloseHandle(ipc_->fd);
 		return -1;
 	}
@@ -904,7 +900,6 @@ static int init_ipc_server(struct ipc *ipc_){
 		struct shmid_ds mds;
 		if(0==shmctl(ipc_->fd,IPC_STAT,&mds)){
 			if(mds.shm_nattch <= 0){
-				printf("ipc not exist\n");
 				ipc_->buffer=(char *)shmat(ipc_->fd,NULL,0);
 				if(!ipc_->buffer){
 					return -1;
@@ -960,7 +955,6 @@ static int init_ipc_client(struct ipc *ipc_){
 			}
 		}
 	}
-	printf("%ld\n",flag);
 	ipc_->client->evt_flag=flag;
 	*(uint *)(buffer+sizeof(ushort))=flag;
 	// Try to open server shared memory 
@@ -989,7 +983,6 @@ static int init_ipc_client(struct ipc *ipc_){
 			ipc_->fd=NULL;
 			return -1;
 		}
-		printf("locate=%ld\n",ipc_->client->locate);
 		if(ipc_->buffer){
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 			*(uint *)ipc_->buffer=timeGetTime();
@@ -1046,7 +1039,6 @@ static int init_ipc_client(struct ipc *ipc_){
 			ipc_->fd=-1;
 			return -1;
 		}
-		printf("locate=%ld\n",ipc_->client->locate);
 		if(ipc_->buffer){
 			ipc_->buffer=ipc_->buffer+sizeof(uint)+get_ringarray_size()+IPC_PEER_SIZE*(ipc_->client->locate+1);
 			*(uint *)ipc_->buffer=timeGetTime();
@@ -1161,6 +1153,8 @@ int close_ipc(struct ipc * ipc_,int id){
 	if(!ipc_ || EMC_LOCAL!=ipc_->type) return -1;
 	if(map_get(ipc_->server->connection,id,(void **)&client) < 0) return -1;
 	write_ipc_data(ipc_,client,id,EMC_CMD_LOGOUT,NULL,0);
+	// If you set the monitor to throw on disconnect events
+	ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 	client->connected=0;
 #if defined (EMC_WINDOWS)
 	if(client->evt){
@@ -1170,8 +1164,6 @@ int close_ipc(struct ipc * ipc_,int id){
 	close(client->evt);client->evt=-1;
 #endif
 	if(0==map_erase(ipc_->server->connection,id)){
-		// If you set the monitor to throw on disconnect events
-		ipc_post_monitor(ipc_,client,(int)client->evt,EMC_EVENT_CLOSED,NULL);
 		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)),client->locate);
 		global_idle_connect_id(id);
 		heap_free(ipc_->server->client_heap,client);

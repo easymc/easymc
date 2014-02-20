@@ -107,7 +107,6 @@ void *heap_alloc(struct heap *hp){
 	head=emc_queue_head(&hp->idle);
 	if(!head || hp->used>=hp->count){
 		int index=0;
-		printf("heap is empty realloc now,size=%ld,block=%ld\n",hp->count,hp->block);
 		buffer=(char*)malloc(hp->count*(hp->block+sizeof(struct emc_queue)));
 		if(!buffer){
 			_unlock_heap(hp);
