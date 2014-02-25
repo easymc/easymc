@@ -49,7 +49,7 @@ struct sockhash {
 #endif
 };
 
-static __inline void lock_hash(struct sockhash *m){
+static __inline void lock_hash(struct sockhash * m){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&m->lock);
 #else
@@ -57,7 +57,7 @@ static __inline void lock_hash(struct sockhash *m){
 #endif
 }
 
-static __inline void unlock_hash(struct sockhash *m){
+static __inline void unlock_hash(struct sockhash * m){
 	if(m){
 #if defined (EMC_WINDOWS)
 		LeaveCriticalSection(&m->lock);
@@ -67,8 +67,10 @@ static __inline void unlock_hash(struct sockhash *m){
 	}
 }
 
-struct sockhash* sockhash_new(int max){
-	int sz = 1;int i = 0;struct sockhash* m = NULL;
+struct sockhash * sockhash_new(int max){
+	int sz = 1;
+	int i = 0;
+	struct sockhash * m = NULL;
 	while (sz <= max) {
 		sz *= 2;
 	}
@@ -78,7 +80,7 @@ struct sockhash* sockhash_new(int max){
 	m->data = (struct node*)malloc(sizeof(struct node) * sz);
 	emc_queue_init(&m->queue);
 	
-	for (i=0;i<sz;i++) {
+	for (i=0; i<sz; i++) {
 		m->hash[i] = NULL;
 		m->data[i].fd = -1;
 		m->data[i].id = 0;
@@ -96,9 +98,9 @@ struct sockhash* sockhash_new(int max){
 
 void sockhash_delete(struct sockhash * m) {
 #if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&(m)->lock);
+	DeleteCriticalSection(&m->lock);
 #else
-	pthread_mutex_destroy(&(m)->lock);		
+	pthread_mutex_destroy(&m->lock);		
 #endif
 	free(m->hash);
 	free(m->data);
@@ -160,7 +162,7 @@ int sockhash_insert(struct sockhash * m, int fd, int id) {
 	return -1;
 }
 
-void sockhash_erase(struct sockhash *m , int fd)
+void sockhash_erase(struct sockhash * m, int fd)
 {
 	int hash = -1;
 	struct node * next = NULL;
@@ -177,7 +179,7 @@ void sockhash_erase(struct sockhash *m , int fd)
 				n->fd = -1;
 				n->id = -1;
 				emc_queue_init(&n->queue);
-				emc_queue_insert_tail(&m->queue,&n->queue);
+				emc_queue_insert_tail(&m->queue, &n->queue);
 				m->hash[hash] = NULL;
 				unlock_hash(m);
 				return;
@@ -189,7 +191,7 @@ void sockhash_erase(struct sockhash *m , int fd)
 			next->fd = -1;
 			next->next = NULL;
 			emc_queue_init(&next->queue);
-			emc_queue_insert_tail(&m->queue,&next->queue);
+			emc_queue_insert_tail(&m->queue, &next->queue);
 			unlock_hash(m);
 			return;
 		}

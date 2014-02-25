@@ -39,14 +39,14 @@ extern "C"{
 #endif
 
 struct hashmap;
-typedef void hashmap_foreach_cb(struct hashmap *m,int id,void* p,void* addition);
+typedef void hashmap_foreach_cb(struct hashmap * m, int id, void * p, void * addition);
 
 struct hashmap * hashmap_new(int max);
 void hashmap_delete(struct hashmap *);
 void *hashmap_search(struct hashmap * , int id);
-int hashmap_insert(struct hashmap * , int id, void *addr);
+int hashmap_insert(struct hashmap * , int id, void * addr);
 void hashmap_erase(struct hashmap *, int id);
-void hashmap_foreach(struct hashmap *,hashmap_foreach_cb *cb,void *addition);
+void hashmap_foreach(struct hashmap *, hashmap_foreach_cb * cb, void * addition);
 
 #ifdef __cplusplus
 }

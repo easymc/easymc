@@ -47,7 +47,7 @@ struct heap{
 };
 #pragma pack()
 
-static __inline void _lock_heap(struct heap* hp){
+static __inline void _lock_heap(struct heap * hp){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&hp->lock);
 #else
@@ -55,7 +55,7 @@ static __inline void _lock_heap(struct heap* hp){
 #endif
 }
 
-static __inline void _unlock_heap(struct heap* hp){
+static __inline void _unlock_heap(struct heap * hp){
 #if defined (EMC_WINDOWS)
 	LeaveCriticalSection(&hp->lock);
 #else
@@ -63,18 +63,18 @@ static __inline void _unlock_heap(struct heap* hp){
 #endif
 }
 
-struct heap *heap_new(int block,int count){
-	int index=0;
-	struct heap *hp=(struct heap *)malloc(sizeof(struct heap));
+struct heap *heap_new(int block, int count){
+	int index = 0;
+	struct heap * hp = (struct heap *)malloc(sizeof(struct heap));
 	if(!hp)return NULL;
-	memset(hp,0,sizeof(struct heap));
-	hp->block=block;
-	hp->mem[0]=(char*)malloc((block+sizeof(struct emc_queue))*count);
-	memset(hp->mem[0],0,(block+sizeof(struct emc_queue))*count);
+	memset(hp, 0, sizeof(struct heap));
+	hp->block = block;
+	hp->mem[0] = (char*)malloc((block+sizeof(struct emc_queue)) * count);
+	memset(hp->mem[0], 0, (block+sizeof(struct emc_queue)) * count);
 	emc_queue_init(&hp->idle);
-	for(index=0;index<count;index++){
+	for(index=0; index<count; index++){
 		emc_queue_init((struct emc_queue *)(hp->mem[0]+index*(sizeof(struct emc_queue)+block)));
-		emc_queue_insert_tail(&hp->idle,(struct emc_queue *)(hp->mem[0]+index*(sizeof(struct emc_queue)+block)));
+		emc_queue_insert_tail(&hp->idle, (struct emc_queue *)(hp->mem[0]+index*(sizeof(struct emc_queue)+block)));
 	}
 	hp->count=count;
 #if defined (EMC_WINDOWS)
@@ -92,7 +92,7 @@ void heap_delete(struct heap * hp){
 #else
 	pthread_mutex_destroy(&hp->lock);
 #endif
-	for(index=0;index<HEAP_DEFAULT_COUNT;index++){
+	for(index=0; index<HEAP_DEFAULT_COUNT; index++){
 		if(hp->mem[index]){
 			free(hp->mem[index]);
 		}
@@ -100,82 +100,82 @@ void heap_delete(struct heap * hp){
 	free(hp);
 }
 
-void *heap_alloc(struct heap *hp){
-	char *buffer=NULL;
-	struct emc_queue *head=NULL;
+void *heap_alloc(struct heap * hp){
+	char *buffer = NULL;
+	struct emc_queue *head = NULL;
 	_lock_heap(hp);
 	head=emc_queue_head(&hp->idle);
-	if(!head || hp->used>=hp->count){
-		int index=0;
-		buffer=(char*)malloc(hp->count*(hp->block+sizeof(struct emc_queue)));
+	if(!head || hp->used >= hp->count){
+		int index = 0;
+		buffer = (char*)malloc(hp->count*(hp->block+sizeof(struct emc_queue)));
 		if(!buffer){
 			_unlock_heap(hp);
 			return NULL;
 		}
-		for(index=0;index<HEAP_DEFAULT_COUNT;index++){
+		for(index=0; index<HEAP_DEFAULT_COUNT; index++){
 			if(!hp->mem[index]){
-				hp->mem[index]=buffer;
+				hp->mem[index] = buffer;
 				break;
 			}
 		}
-		memset(buffer,0,hp->count*(hp->block+sizeof(struct emc_queue)));
-		for(index=0;index<hp->count;index++){
+		memset(buffer, 0, hp->count * (hp->block+sizeof(struct emc_queue)));
+		for(index=0; index<hp->count; index++){
 			emc_queue_init((struct emc_queue *)(buffer+index*(hp->block+sizeof(struct emc_queue))));
 			emc_queue_insert_tail(&hp->idle,(struct emc_queue *)(buffer+index*(hp->block+sizeof(struct emc_queue))));
 		}
 		hp->count *= 2;
-		head=emc_queue_head(&hp->idle);
+		head = emc_queue_head(&hp->idle);
 	}
 	if(!head){
 		_unlock_heap(hp);
 		return NULL;
 	}
 	emc_queue_remove(head);
-	buffer=(char *)head+sizeof(struct emc_queue);
-	hp->used++;
+	buffer = (char *)head+sizeof(struct emc_queue);
+	hp->used ++;
 	_unlock_heap(hp);
 	return buffer;
 }
 
-int heap_free(struct heap *hp,void* buf){
-	struct emc_queue *head=(struct emc_queue *)((char *)buf-sizeof(struct emc_queue));
+int heap_free(struct heap * hp, void * buf){
+	struct emc_queue * head = (struct emc_queue *)((char *)buf-sizeof(struct emc_queue));
 	_lock_heap(hp);
 	if(!hp->used){
 		_unlock_heap(hp);
 		return -1;
 	}
 	emc_queue_init(head);
-	emc_queue_insert_tail(&hp->idle,head);
-	hp->used--;
+	emc_queue_insert_tail(&hp->idle, head);
+	hp->used --;
 	_unlock_heap(hp);
 	return 0;
 }
 
-int heap_size(struct heap *hp){
-	int size=0;
+int heap_size(struct heap * hp){
+	int size = 0;
 	_lock_heap(hp);
-	size=hp->used;
+	size = hp->used;
 	_unlock_heap(hp);
 	return size;
 }
 
-void heap_reset(struct heap *hp){
-	int index=0,index2=0,count=0,num=0;
+void heap_reset(struct heap * hp){
+	int index = 0,index2 = 0,count = 0,num = 0;
 	_lock_heap(hp);
-	for(index=0;index<HEAP_DEFAULT_COUNT;index++){
+	for(index=0; index<HEAP_DEFAULT_COUNT; index++){
 		if(hp->mem[index]){
-			num++;
+			num ++;
 		}else break;
 	}
-	count=hp->count/num;
-	for(index=0;index<num;index++){
+	count = hp->count/num;
+	for(index=0; index<num; index++){
 		if(hp->mem[index]){
-			for(index2=0;index2<count;index2++){
+			for(index2=0; index2<count; index2++){
 				emc_queue_init((struct emc_queue *)(hp->mem[index]+index2*(sizeof(struct emc_queue)+hp->block)));
 				emc_queue_insert_tail(&hp->idle,(struct emc_queue *)(hp->mem[index]+index2*(sizeof(struct emc_queue)+hp->block)));
 			}
 		}
 	}
-	hp->used=0;
+	hp->used = 0;
 	_unlock_heap(hp);
 }

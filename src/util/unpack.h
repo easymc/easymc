@@ -39,21 +39,21 @@ extern "C"{
 
 struct unpack;
 
-typedef void unpack_get_data(char* data,unsigned short len,int id,void* args);
+typedef void unpack_get_data(char * data, unsigned short len, int id, void * args);
 
 // Create an unpacker, max indicates how many different socket while unpacking the maximum allowed, 
 // cb callback function which returns data address
 struct unpack * unpack_new(unsigned int count);
 // Delete depacketizer
-void unpack_delete(struct unpack *un);
+void unpack_delete(struct unpack * un);
 // Allocate an empty unit from depacketizer
-void* unpack_alloc(struct unpack *un);
+void* unpack_alloc(struct unpack * un);
 // Writing data to the unpacker, NULL if the block is to open a new block, if the block is not empty block in the original operating
-int unpack_add(void* block,char *data,int len);
+int unpack_add(void * block, char * data, int len);
 // For a complete packet, the data returned by the callback function
-void unpack_get(void* block,unpack_get_data *cb,int id,void* args,char *buffer);
+void unpack_get(void * block, unpack_get_data * cb, int id, void * args, char * buffer);
 // Release has finished using the unpacking unit
-void unpack_free(struct unpack *un,void* block);
+void unpack_free(struct unpack * un, void * block);
 
 #ifdef __cplusplus
 }

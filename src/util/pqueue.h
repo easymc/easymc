@@ -40,12 +40,12 @@ extern "C"{
 #endif
 
 struct pqueue;
-struct pqueue*	create_pqueue();
-void			delete_pqueue(struct pqueue* ptqueue);
-int				pqueue_push(struct pqueue* queue,void* data);
-int				pqueue_push_head(struct pqueue* queue,void* data);
-int				pqueue_pop(struct pqueue* queue,void** buf);
-unsigned int	pqueue_size(struct pqueue* queue);
+struct pqueue *	create_pqueue();
+void			delete_pqueue(struct pqueue * ptqueue);
+int				pqueue_push(struct pqueue * queue, void * data);
+int				pqueue_push_head(struct pqueue * queue, void * data);
+int				pqueue_pop(struct pqueue * queue, void ** buf);
+unsigned int	pqueue_size(struct pqueue * queue);
 
 #ifdef __cplusplus
 }

@@ -48,7 +48,7 @@ struct uniquequeue{
 #pragma pack()
 
 
-static __inline void _lock_queue(struct uniquequeue* queue){
+static __inline void _lock_queue(struct uniquequeue * queue){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&queue->lock);
 #else
@@ -56,27 +56,27 @@ static __inline void _lock_queue(struct uniquequeue* queue){
 #endif
 }
 
-static __inline void _unlock_queue(struct uniquequeue* queue){
+static __inline void _unlock_queue(struct uniquequeue * queue){
 #if defined (EMC_WINDOWS)
 	LeaveCriticalSection(&queue->lock);
 #else
 	pthread_mutex_unlock(&queue->lock);
 #endif
 }
-struct uniquequeue* create_uqueue(){
-	struct uniquequeue *uq=(struct uniquequeue *)malloc(sizeof(struct uniquequeue));
+struct uniquequeue * create_uqueue(){
+	struct uniquequeue * uq = (struct uniquequeue *)malloc(sizeof(struct uniquequeue));
 	if(!uq)return NULL;
-	memset(uq,0,sizeof(struct uniquequeue));
-	uq->wait=create_event();
+	memset(uq, 0, sizeof(struct uniquequeue));
+	uq->wait = create_event();
 #if defined (EMC_WINDOWS)
 	InitializeCriticalSection(&uq->lock);
 #else
-	pthread_mutex_init(&uq->lock,NULL);		
+	pthread_mutex_init(&uq->lock, NULL);		
 #endif
 	return uq;
 }
 
-void delete_uqueue(struct uniquequeue* uq){
+void delete_uqueue(struct uniquequeue * uq){
 #if defined (EMC_WINDOWS)
 	DeleteCriticalSection(&uq->lock);
 #else
@@ -86,44 +86,44 @@ void delete_uqueue(struct uniquequeue* uq){
 	free(uq);
 }
 
-uint push_uqueue(struct uniquequeue* uq,int v){
+uint push_uqueue(struct uniquequeue * uq, int v){
 	_lock_queue(uq);
 	if(uq->_map[v] > 0){
 		_unlock_queue(uq);
 		return 0;
 	}
-	if(uq->used>=MAX_ARRAY_SIZE){
+	if(uq->used >= MAX_ARRAY_SIZE){
 		_unlock_queue(uq);
 		return -1;
 	}
-	uq->_array[uq->used++]=v;
-	uq->_map[v]=1;
+	uq->_array[uq->used ++] = v;
+	uq->_map[v] = 1;
 	post_event(uq->wait);
 	_unlock_queue(uq);
 	return 0;
 }
 
-int pop_uqueue(struct uniquequeue* uq){
-	int v=-1;
+int pop_uqueue(struct uniquequeue * uq){
+	int v = -1;
 	_lock_queue(uq);
 	if(!uq->used){
 		_unlock_queue(uq);
 		return -1;
 	}
-	v=uq->_array[0];
+	v = uq->_array[0];
 	if(uq->used > 1){
-		memmove(uq->_array,uq->_array+1,sizeof(int)*(uq->used-1));
+		memmove(uq->_array, uq->_array+1, sizeof(int) * (uq->used-1));
 	}
-	uq->_map[v]=0;
-	uq->used--;
+	uq->_map[v] = 0;
+	uq->used --;
 	_unlock_queue(uq);
 	return v;
 }
 
-int wait_uqueue(struct uniquequeue* uq){
-	return wait_event(uq->wait,-1);
+int wait_uqueue(struct uniquequeue * uq){
+	return wait_event(uq->wait, -1);
 }
 
-void post_uqueue(struct uniquequeue* uq){
+void post_uqueue(struct uniquequeue * uq){
 	post_event(uq->wait);
 }

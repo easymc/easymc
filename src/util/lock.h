@@ -34,10 +34,10 @@ extern "C"{
 #endif
 
 struct emc_lock;
-struct emc_lock *lock_new();
-void lock_delete(struct emc_lock *lck);
-void lock_enter(struct emc_lock *lck);
-void lock_leave(struct emc_lock *lck);
+struct emc_lock * lock_new();
+void lock_delete(struct emc_lock * lck);
+void lock_enter(struct emc_lock * lck);
+void lock_leave(struct emc_lock * lck);
 
 #ifdef __cplusplus
 }

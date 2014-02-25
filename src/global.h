@@ -34,11 +34,11 @@ extern "C"{
 #endif
 
 // Reconnection callback function
-typedef int on_reconnect_cb(void *client,void *addition);
+typedef int on_reconnect_cb(void * client, void * addition);
 
 void global_term(void);
 
-int global_add_device(void *device_);
+int global_add_device(void * device_);
 void *global_get_device(int id);
 void global_erase_device(int id);
 
@@ -53,15 +53,15 @@ unsigned int global_get_data_serial();
 int global_get_connect_id();
 void global_idle_connect_id(int id);
 
-int global_push_sendqueue(int id,void *p);
-int global_push_head_sendqueue(int id,void *p);
-int global_pop_sendqueue(int id,void **p);
+int global_push_sendqueue(int id, void * p);
+int global_push_head_sendqueue(int id, void * p);
+int global_pop_sendqueue(int id, void ** p);
 unsigned int global_sendqueue_size(int id);
 
 void *global_alloc_monitor();
-void global_free_monitor(void *data);
+void global_free_monitor(void * data);
 
-int global_add_reconnect(int id,on_reconnect_cb *cb,void *client,void *addition);
+int global_add_reconnect(int id, on_reconnect_cb *cb, void * client, void * addition);
 
 int global_rand_number();
 

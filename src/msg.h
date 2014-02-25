@@ -38,19 +38,19 @@ extern "C"{
 //get message struct size
 int emc_msg_struct_size();
 // Get the message additional data
-void *emc_msg_get_addition(void *msg);
+void * emc_msg_get_addition(void * msg);
 // Analyzing the message reference count is 0
-int emc_msg_zero_ref(void *msg);
+int emc_msg_zero_ref(void * msg);
 // Message reference count is incremented
-int emc_msg_ref_add(void *msg);
+int emc_msg_ref_add(void * msg);
 // Message reference count is decreased
-int emc_msg_ref_dec(void *msg);
+int emc_msg_ref_dec(void * msg);
 // Gets the message sequence number
-int emc_msg_serial(void *msg);
+int emc_msg_serial(void * msg);
 // Set the message operating result
-int emc_msg_set_result(void *msg,unsigned int result);
+int emc_msg_set_result(void * msg, unsigned int result);
 // Get the message operating result
-int emc_msg_get_result(void *msg,unsigned int *result);
+int emc_msg_get_result(void * msg, unsigned int * result);
 
 #ifdef __cplusplus
 }

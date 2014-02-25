@@ -46,18 +46,18 @@ struct event{
 #pragma pack()
 
 struct event* create_event(){
-	struct event *evt=(struct event *)malloc(sizeof(struct event));
+	struct event * evt = (struct event *)malloc(sizeof(struct event));
 #ifdef EMC_WINDOWS
-	evt->evt=CreateEvent(NULL,FALSE,FALSE,NULL);
+	evt->evt = CreateEvent(NULL, FALSE, FALSE, NULL);
 #else
-	sem_init(&evt->evt,0,0);
-	pthread_mutex_init(&evt->lock,NULL);
-	pthread_cond_init(&evt->cond,NULL);
+	sem_init(&evt->evt, 0, 0);
+	pthread_mutex_init(&evt->lock, NULL);
+	pthread_cond_init(&evt->cond, NULL);
 #endif
 	return evt;
 }
 
-void delete_event(struct event *evt){
+void delete_event(struct event * evt){
 #ifdef EMC_WINDOWS
 	CloseHandle(evt->evt);
 #else
@@ -68,44 +68,44 @@ void delete_event(struct event *evt){
 	free(evt);
 }
 
-int wait_event(struct event *evt,int timeout){
-	int status=-1;
+int wait_event(struct event * evt, int timeout){
+	int status = -1;
 #ifdef EMC_WINDOWS
-	status=WaitForSingleObject(evt->evt,timeout>=0?timeout:INFINITE);
-	if(WAIT_OBJECT_0==status){
+	status = WaitForSingleObject(evt->evt, timeout>=0?timeout:INFINITE);
+	if(WAIT_OBJECT_0 == status){
 		ResetEvent(evt->evt);
 		return 0;
 	}
-	else if(WAIT_TIMEOUT==status){
+	else if(WAIT_TIMEOUT == status){
 		ResetEvent(evt->evt);
 		return 1;
 	}
 	return -1;
 #else
-	evt->timeout=timeout;
+	evt->timeout = timeout;
 	if(timeout < 0){
 		return sem_wait(&evt->evt);
 	}
 	pthread_mutex_lock(&evt->lock);
-	if(timeout>0){
-		struct timespec tp={time(NULL)+timeout/1000,(timeout%1000)*1000*1000};
-		status=pthread_cond_timedwait(&evt->cond,&evt->lock,&tp);
+	if(timeout > 0){
+		struct timespec tp = {time(NULL)+timeout/1000, (timeout%1000)*1000*1000};
+		status = pthread_cond_timedwait(&evt->cond, &evt->lock, &tp);
 	}
 	else{
-		status=pthread_cond_wait(&evt->cond,&evt->lock);
+		status = pthread_cond_wait(&evt->cond, &evt->lock);
 	}
 	pthread_mutex_unlock(&evt->lock);
-	if(0==status){
+	if(0 == status){
 		return 0;
 	}
-	else if(ETIMEDOUT==status){
+	else if(ETIMEDOUT == status){
 		return 1;
 	}
 	return -1;
 #endif
 }
 
-int post_event(struct event *evt){
+int post_event(struct event * evt){
 #ifdef EMC_WINDOWS
 	if(!SetEvent(evt->evt))
 		return -1;

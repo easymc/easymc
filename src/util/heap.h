@@ -38,12 +38,12 @@ extern "C"{
 #endif
 
 struct heap;
-struct heap * heap_new(int block,int count);
-void heap_delete(struct heap *h);
-void heap_reset(struct heap *h);
-void *heap_alloc(struct heap *h);
-int heap_free(struct heap *h,void* buf);
-int heap_size(struct heap *h);
+struct heap * heap_new(int block, int count);
+void heap_delete(struct heap * h);
+void heap_reset(struct heap * h);
+void * heap_alloc(struct heap * h);
+int heap_free(struct heap * h, void * buf);
+int heap_size(struct heap * h);
 
 #ifdef __cplusplus
 }

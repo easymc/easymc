@@ -33,8 +33,8 @@ thread_t thread_self(){
 	return GetCurrentThreadId();
 }
 
-int thread_create(thread_t *thrd,void *attr,thread_bc bc,void *args){
-	HANDLE h=(HANDLE)_beginthreadex(NULL,0,bc,args,0,thrd);
+int thread_create(thread_t * thrd, void * attr, thread_bc bc, void * args){
+	HANDLE h = (HANDLE)_beginthreadex(NULL, 0,bc, args, 0, thrd);
 	return h>0?0:GetLastError();
 }
 

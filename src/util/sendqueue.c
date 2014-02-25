@@ -58,7 +58,7 @@ struct sendqueue{
 
 #pragma pack()
 
-static __inline void _lock_queue(struct sendqueue* sq){
+static __inline void _lock_queue(struct sendqueue * sq){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&sq->lock);
 #else
@@ -66,7 +66,7 @@ static __inline void _lock_queue(struct sendqueue* sq){
 #endif
 }
 
-static __inline void _unlock_queue(struct sendqueue* sq){
+static __inline void _unlock_queue(struct sendqueue * sq){
 #if defined (EMC_WINDOWS)
 	LeaveCriticalSection(&sq->lock);
 #else
@@ -74,20 +74,20 @@ static __inline void _unlock_queue(struct sendqueue* sq){
 #endif
 }
 
-struct sendqueue *create_sendqueue(){
+struct sendqueue * create_sendqueue(){
 	uint index=0;
-	struct sendqueue *sq=(struct sendqueue *)malloc(sizeof(struct sendqueue));
-	if(!sq)return NULL;
-	memset(sq,0,sizeof(struct sendqueue));
+	struct sendqueue * sq = (struct sendqueue *)malloc(sizeof(struct sendqueue));
+	if(!sq) return NULL;
+	memset(sq, 0, sizeof(struct sendqueue));
 	emc_queue_init(&sq->idle);
-	for(index=0;index<EMC_SOCKETS_DEFAULT;index++){
+	for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
 		emc_queue_init(&sq->_map[index].queue);
 	}
-	sq->units[sq->total++]=(struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-	memset(sq->units[sq->total-1],0,sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-	for(index=0;index<EMC_SOCKETS_DEFAULT;index++){
+	sq->units[sq->total++] = (struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+	memset(sq->units[sq->total-1], 0, sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+	for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
 		emc_queue_init(&(sq->units[sq->total-1]+index)->queue);
-		emc_queue_insert_tail(&sq->idle,&(sq->units[sq->total-1]+index)->queue);
+		emc_queue_insert_tail(&sq->idle, &(sq->units[sq->total-1]+index)->queue);
 	}
 #if defined (EMC_WINDOWS)
 	InitializeCriticalSection(&sq->lock);
@@ -97,9 +97,9 @@ struct sendqueue *create_sendqueue(){
 	return sq;
 }
 
-void delete_sendqueue(struct sendqueue *sq){
-	uint index=0;
-	for(index=0;index<sq->total;index++){
+void delete_sendqueue(struct sendqueue * sq){
+	uint index = 0;
+	for(index=0; index<sq->total; index++){
 		free(sq->units[index]);
 	}
 #if defined (EMC_WINDOWS)
@@ -110,10 +110,10 @@ void delete_sendqueue(struct sendqueue *sq){
 	free(sq);
 }
 
-int sendqueue_push(struct sendqueue *sq,int id,void *data){
-	uint index=0;
-	struct sendqueue_unit *unit=NULL;
-	struct emc_queue *head=NULL;
+int sendqueue_push(struct sendqueue * sq, int id, void * data){
+	uint index = 0;
+	struct sendqueue_unit * unit = NULL;
+	struct emc_queue * head = NULL;
 	if(id<0 || id >= EMC_SOCKETS_DEFAULT) return -1;
 	_lock_queue(sq);
 	if(sq->_map[id].count >= SQ_DEFAULT_SIZE){
@@ -121,88 +121,88 @@ int sendqueue_push(struct sendqueue *sq,int id,void *data){
 		return -1;
 	}
 	if(emc_queue_empty(&sq->idle)){
-		sq->units[sq->total++]=(struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-		memset(sq->units[sq->total-1],0,sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-		for(index=0;index<EMC_SOCKETS_DEFAULT;index++){
+		sq->units[sq->total++] = (struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+		memset(sq->units[sq->total-1], 0, sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+		for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
 			emc_queue_init(&(sq->units[sq->total-1]+index)->queue);
-			emc_queue_insert_tail(&sq->idle,&(sq->units[sq->total-1]+index)->queue);
+			emc_queue_insert_tail(&sq->idle, &(sq->units[sq->total-1]+index)->queue);
 		}
 	}
-	head=emc_queue_head(&sq->idle);
+	head = emc_queue_head(&sq->idle);
 	if(!head){
 		_unlock_queue(sq);
 		return -1;
 	}
 	emc_queue_remove(head);
 	emc_queue_init(head);
-	unit=emc_queue_data(head,struct sendqueue_unit,queue);
-	unit->data=data;
-	emc_queue_insert_tail(&sq->_map[id].queue,head);
-	sq->_map[id].count++;
+	unit = emc_queue_data(head, struct sendqueue_unit,queue);
+	unit->data = data;
+	emc_queue_insert_tail(&sq->_map[id].queue, head);
+	sq->_map[id].count ++;
 	_unlock_queue(sq);
 	return 0;
 }
 
-int sendqueue_push_head(struct sendqueue *sq,int id,void *data){
-	uint index=0;
-	struct sendqueue_unit *unit=NULL;
-	struct emc_queue *head=NULL;
-	if(id<0 || id >= EMC_SOCKETS_DEFAULT) return -1;
+int sendqueue_push_head(struct sendqueue * sq, int id, void * data){
+	uint index = 0;
+	struct sendqueue_unit * unit = NULL;
+	struct emc_queue * head = NULL;
+	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return -1;
 	_lock_queue(sq);
 	if(sq->_map[id].count >= SQ_DEFAULT_SIZE){
 		_unlock_queue(sq);
 		return -1;
 	}
 	if(emc_queue_empty(&sq->idle)){
-		sq->units[sq->total++]=(struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-		memset(sq->units[sq->total-1],0,sizeof(struct sendqueue_unit)*EMC_SOCKETS_DEFAULT);
-		for(index=0;index<EMC_SOCKETS_DEFAULT;index++){
+		sq->units[sq->total++] = (struct sendqueue_unit*)malloc(sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+		memset(sq->units[sq->total-1], 0, sizeof(struct sendqueue_unit) * EMC_SOCKETS_DEFAULT);
+		for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
 			emc_queue_init(&(sq->units[sq->total-1]+index)->queue);
-			emc_queue_insert_tail(&sq->idle,&(sq->units[sq->total-1]+index)->queue);
+			emc_queue_insert_tail(&sq->idle, &(sq->units[sq->total-1]+index)->queue);
 		}
 	}
-	head=emc_queue_head(&sq->idle);
+	head = emc_queue_head(&sq->idle);
 	if(!head){
 		_unlock_queue(sq);
 		return -1;
 	}
 	emc_queue_remove(head);
 	emc_queue_init(head);
-	unit=emc_queue_data(head,struct sendqueue_unit,queue);
-	unit->data=data;
-	emc_queue_insert_head(&sq->_map[id].queue,head);
-	sq->_map[id].count++;
+	unit = emc_queue_data(head, struct sendqueue_unit, queue);
+	unit->data = data;
+	emc_queue_insert_head(&sq->_map[id].queue, head);
+	sq->_map[id].count ++;
 	_unlock_queue(sq);
 	return 0;
 }
 
-int sendqueue_pop(struct sendqueue *sq,int id,void **data){
-	struct emc_queue *head=NULL;
-	struct sendqueue_unit *unit=NULL;
-	if(id<0 || id >= EMC_SOCKETS_DEFAULT) return -1;
+int sendqueue_pop(struct sendqueue * sq, int id, void ** data){
+	struct emc_queue * head = NULL;
+	struct sendqueue_unit * unit = NULL;
+	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return -1;
 	_lock_queue(sq);
-	head=emc_queue_head(&sq->_map[id].queue);
+	head = emc_queue_head(&sq->_map[id].queue);
 	if(!head){
 		_unlock_queue(sq);
 		return -1;
 	}
 	emc_queue_remove(head);
-	sq->_map[id].count--;
-	unit=emc_queue_data(head,struct sendqueue_unit,queue);
+	sq->_map[id].count --;
+	unit = emc_queue_data(head, struct sendqueue_unit, queue);
 	if(data){
-		*data=unit->data;
+		*data = unit->data;
 	}
 	emc_queue_init(head);
-	emc_queue_insert_tail(&sq->idle,head);
+	emc_queue_insert_tail(&sq->idle, head);
 	_unlock_queue(sq);
 	return 0;
 }
 
-uint sendqueue_size(struct sendqueue *sq,int id){
-	uint size=0;
-	if(id<0 || id >= EMC_SOCKETS_DEFAULT) return 0;
+uint sendqueue_size(struct sendqueue * sq, int id){
+	uint size = 0;
+	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return 0;
 	_lock_queue(sq);
-	size=sq->_map[id].count;
+	size = sq->_map[id].count;
 	_unlock_queue(sq);
 	return size;
 }

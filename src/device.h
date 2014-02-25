@@ -38,8 +38,8 @@ extern "C"{
 	uint get_device_monitor(int id);
 	// Whether the device can be controlled
 	uint get_device_control(int id);
-	int push_device_message(int id,void *msg);
-	int push_device_event(int id,void *data);
+	int push_device_message(int id, void * msg);
+	int push_device_event(int id, void * data);
 
 #ifdef __cplusplus
 }

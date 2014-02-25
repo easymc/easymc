@@ -51,7 +51,7 @@ struct pqueue
 };
 #pragma pack()
 
-static __inline void _lock_queue(struct pqueue* queue){
+static __inline void _lock_queue(struct pqueue * queue){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&queue->lock);
 #else
@@ -59,7 +59,7 @@ static __inline void _lock_queue(struct pqueue* queue){
 #endif
 }
 
-static __inline void _unlock_queue(struct pqueue* queue){
+static __inline void _unlock_queue(struct pqueue * queue){
 #if defined (EMC_WINDOWS)
 	LeaveCriticalSection(&queue->lock);
 #else
@@ -67,14 +67,14 @@ static __inline void _unlock_queue(struct pqueue* queue){
 #endif
 }
 
-struct pqueue* create_pqueue()
+struct pqueue * create_pqueue()
 {
-	struct pqueue * queue=(struct pqueue *)malloc(sizeof(struct pqueue));
-	if(!queue)return NULL;
-	memset(queue,0,sizeof(struct pqueue));
-	queue->units=(void**)malloc(sizeof(void *)*PQUEUE_SIZE);
-	queue->size=PQUEUE_SIZE;
-	memset(queue->units,0,sizeof(void *)*PQUEUE_SIZE);
+	struct pqueue * queue = (struct pqueue *)malloc(sizeof(struct pqueue));
+	if(!queue) return NULL;
+	memset(queue, 0, sizeof(struct pqueue));
+	queue->units = (void**)malloc(sizeof(void *) * PQUEUE_SIZE);
+	queue->size = PQUEUE_SIZE;
+	memset(queue->units, 0, sizeof(void *) * PQUEUE_SIZE);
 #if defined (EMC_WINDOWS)
 	InitializeCriticalSection(&queue->lock);
 #else
@@ -83,7 +83,7 @@ struct pqueue* create_pqueue()
 	return queue;
 }
 
-void delete_pqueue(struct pqueue* queue){
+void delete_pqueue(struct pqueue * queue){
 	if(queue){
 #if defined (EMC_WINDOWS)
 		DeleteCriticalSection(&queue->lock);
@@ -95,51 +95,51 @@ void delete_pqueue(struct pqueue* queue){
 	}
 }
 
-int pqueue_push(struct pqueue* queue,void* data){
+int pqueue_push(struct pqueue * queue, void * data){
 	_lock_queue(queue);
 	if(queue->used >= queue->size){
-		queue->units=(void**)realloc(queue->units,sizeof(void *)*(queue->size+PQUEUE_SIZE));
-		queue->size+=PQUEUE_SIZE;
+		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
+		queue->size += PQUEUE_SIZE;
 	}
-	queue->units[queue->used]=data;
-	queue->used++;
+	queue->units[queue->used] = data;
+	queue->used ++;
 	_unlock_queue(queue);
 	return 0;
 }
 
-int pqueue_push_head(struct pqueue* queue,void* data){
+int pqueue_push_head(struct pqueue * queue, void * data){
 	_lock_queue(queue);
 	if(queue->used >= queue->size){
-		queue->units=(void**)realloc(queue->units,sizeof(void *)*(queue->size+PQUEUE_SIZE));
-		queue->size+=PQUEUE_SIZE;
+		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
+		queue->size += PQUEUE_SIZE;
 	}
 	if(queue->used){
-		memmove(&queue->units[1],&queue->units[0],sizeof(void *)*queue->used);
-		queue->units[0]=data;
-		queue->used++;
+		memmove(&queue->units[1], &queue->units[0], sizeof(void *) * queue->used);
+		queue->units[0] = data;
+		queue->used ++;
 	} else {
-		queue->units[queue->used++]=data;
+		queue->units[queue->used++] = data;
 	}
 	_unlock_queue(queue);
 	return 0;
 }
 
-int pqueue_pop(struct pqueue* queue,void** buf){
+int pqueue_pop(struct pqueue * queue, void ** buf){
 	_lock_queue(queue);
 	if(!queue->used){
 		_unlock_queue(queue);
 		return -1;
 	}
-	*buf=queue->units[0];
-	queue->used--;
+	*buf = queue->units[0];
+	queue->used --;
 	if(queue->used){
-		memmove(&queue->units[0],&queue->units[1],sizeof(void *)*queue->used);
+		memmove(&queue->units[0], &queue->units[1], sizeof(void *) * queue->used);
 	}
 	_unlock_queue(queue);
 	return 0;
 }
 
-unsigned int pqueue_size(struct pqueue* queue){
+unsigned int pqueue_size(struct pqueue * queue){
 	unsigned int size = 0;
 	_lock_queue(queue);
 	size = queue->used;

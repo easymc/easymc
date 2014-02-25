@@ -41,7 +41,7 @@ struct emc_lock{
 #pragma pack()
 
 
-struct emc_lock *lock_new(){
+struct emc_lock * lock_new(){
 	struct emc_lock *lck=(struct emc_lock *)malloc(sizeof(struct emc_lock));
 	if(!lck)return NULL;
 #ifdef EMC_WINDOWS
@@ -52,7 +52,7 @@ struct emc_lock *lock_new(){
 	return lck;
 }
 
-void lock_delete(struct emc_lock *lck){
+void lock_delete(struct emc_lock * lck){
 #ifdef EMC_WINDOWS
 	DeleteCriticalSection(&lck->lock);
 #else
@@ -62,7 +62,7 @@ void lock_delete(struct emc_lock *lck){
 }
 
 void
-lock_enter(struct emc_lock *lck){
+lock_enter(struct emc_lock * lck){
 #ifdef EMC_WINDOWS
 	EnterCriticalSection(&lck->lock);
 #else
@@ -71,7 +71,7 @@ lock_enter(struct emc_lock *lck){
 }
 
 void
-lock_leave(struct emc_lock *lck){
+lock_leave(struct emc_lock * lck){
 #ifdef EMC_WINDOWS
 	LeaveCriticalSection(&lck->lock);
 #else

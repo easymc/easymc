@@ -56,7 +56,7 @@ struct event* create_event(void);
 * Return: N/A
 * Remark: N/A
 ***************************************************************************/
-void delete_event(struct event *evt);
+void delete_event(struct event * evt);
 
 /**************************************************************************
 * Name: wait_event
@@ -66,7 +66,7 @@ void delete_event(struct event *evt);
 * Return: 0 Mean success£¬1 Mean timeout£¬-1 Mean failure
 * Remark: N/A
 ***************************************************************************/
-int wait_event(struct event *evt,int timeout);
+int wait_event(struct event * evt,int timeout);
 
 /**************************************************************************
 * Name: post_event
@@ -76,7 +76,7 @@ int wait_event(struct event *evt,int timeout);
 * Return: 0 Mean success£¬-1 Mean failure
 * Remark: N/A
 ***************************************************************************/
-int post_event(struct event *evt);
+int post_event(struct event * evt);
 
 #ifdef __cplusplus
 }

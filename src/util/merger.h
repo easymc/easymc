@@ -38,27 +38,27 @@
 extern "C"{
 #endif
 
-typedef void merger_get_cb(char* data,int len,int id,void* addition);
+typedef void merger_get_cb(char * data, int len, int id, void * addition);
 
 struct merger;
 
 // Create an unpacker, max indicates how many different socket while unpacking the maximum allowed, 
 // cb callback function which returns data address
-struct merger *merger_new(unsigned int count);
+struct merger * merger_new(unsigned int count);
 // Delete depacketizer
-void merger_delete(struct merger *un);
+void merger_delete(struct merger * un);
 // Allocate an empty unit from depacketizer
-void* merger_alloc(struct merger *un);
+void * merger_alloc(struct merger * un);
 // Initialization, the memory space previously prepared
-void merger_init(void* block,int len);
+void merger_init(void * block, int len);
 // Add data to unpacking vessel, start representing the starting position to copy data
-int merger_add(void* block,int start,char *data,int len);
+int merger_add(void * block, int start, char * data, int len);
 // For a complete packet from the block, the data returned by the callback function
-int merger_get(void* block,merger_get_cb *cb,int id,void* addition);
+int merger_get(void * block, merger_get_cb * cb, int id, void * addition);
 // Gets the last time the data received from the block
-unsigned int merger_time(void* block);
+unsigned int merger_time(void * block);
 // Release has finished using the Block
-void merger_free(struct merger *un,void* block);
+void merger_free(struct merger * un, void * block);
 
 #ifdef __cplusplus
 }

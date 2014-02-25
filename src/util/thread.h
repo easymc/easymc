@@ -55,10 +55,10 @@ extern "C" {
 typedef unsigned int thread_t;
 typedef unsigned int thread_result_t;
 #define THREAD_CALL __stdcall
-typedef thread_result_t __stdcall thread_bc(void *args);
+typedef thread_result_t __stdcall thread_bc(void * args);
 
 thread_t thread_self();
-int thread_create(thread_t *thrd,void *attr,thread_bc bc,void *args);
+int thread_create(thread_t * thrd, void * attr, thread_bc bc, void * args);
 
 #ifdef __cplusplus
 }

@@ -50,7 +50,7 @@ extern "C"{
 	* Return: struct ringqueue pointer
 	* Remark: N/A
 	***************************************************************************/
-	struct ringqueue *create_ringqueue(unsigned char mode);
+	struct ringqueue * create_ringqueue(unsigned char mode);
 
 	/**************************************************************************
 	* Name: delete_ringqueue

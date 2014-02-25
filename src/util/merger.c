@@ -49,7 +49,7 @@ struct merger_unit{
 };
 
 struct merger{
-	struct merger_unit		*units;
+	struct merger_unit	*	units;
 	struct emc_queue		idle;
 	// Represents the number of units assigned to the elements
 	volatile unsigned int	count;
@@ -61,7 +61,7 @@ struct merger{
 };
 #pragma pack()
 
-static void _merger_lock(struct merger *un){
+static void _merger_lock(struct merger * un){
 #if defined (EMC_WINDOWS)
 	EnterCriticalSection(&un->lock);
 #else
@@ -69,7 +69,7 @@ static void _merger_lock(struct merger *un){
 #endif
 }
 
-static void _merger_unlock(struct merger *un){
+static void _merger_unlock(struct merger * un){
 #if defined (EMC_WINDOWS)
 	LeaveCriticalSection(&un->lock);
 #else
@@ -78,24 +78,24 @@ static void _merger_unlock(struct merger *un){
 }
 
 struct merger *merger_new(unsigned int count){
-	struct merger *un=(struct merger *)malloc(sizeof(struct merger));
+	struct merger * un = (struct merger *)malloc(sizeof(struct merger));
 	int index = 0;
 	
-	if(!un)return NULL;
-	if(!count)count=MERGER_DEFAULT_COUNT;
-	memset(un,0,sizeof(struct merger));
-	un->count=count;
+	if(!un) return NULL;
+	if(!count)count = MERGER_DEFAULT_COUNT;
+	memset(un, 0, sizeof(struct merger));
+	un->count = count;
 	emc_queue_init(&un->idle);
-	un->units=(struct merger_unit *)malloc(sizeof(struct merger_unit)*count);
-	memset(un->units,0,sizeof(struct merger_unit)*count);
-	for(index=0;index<count;index++){
+	un->units = (struct merger_unit *)malloc(sizeof(struct merger_unit) * count);
+	memset(un->units, 0, sizeof(struct merger_unit) * count);
+	for(index=0; index<count; index++){
 		emc_queue_init(&un->units[index].queue);
-		emc_queue_insert_tail(&un->idle,&un->units[index].queue);
+		emc_queue_insert_tail(&un->idle, &un->units[index].queue);
 	}
 #if defined (EMC_WINDOWS)
 	InitializeCriticalSection(&un->lock);
 #else
-	pthread_mutex_init(&un->lock,NULL);
+	pthread_mutex_init(&un->lock, NULL);
 #endif
 	return un;
 }
@@ -110,77 +110,77 @@ void merger_delete(struct merger * un){
 	free(un);
 }
 
-void* merger_alloc(struct merger *un){
-	struct emc_queue *head=NULL;
+void* merger_alloc(struct merger * un){
+	struct emc_queue * head = NULL;
 	
 	_merger_lock(un);
-	head=emc_queue_head(&un->idle);
+	head = emc_queue_head(&un->idle);
 	if(!head){
 		_merger_unlock(un);
 		return NULL;
 	}
 	emc_queue_remove(head);
 	_merger_unlock(un);
-	return emc_queue_data(head,struct merger_unit,queue);
+	return emc_queue_data(head, struct merger_unit, queue);
 }
 
-void merger_init(void* block,int len){
-	struct merger_unit *unit=(struct merger_unit *)block;
+void merger_init(void * block, int len){
+	struct merger_unit * unit = (struct merger_unit *)block;
 	if(unit->buffer){
-		if(unit->total<len){
+		if(unit->total < len){
 			free_impl(unit->buffer);
-			unit->buffer=NULL;
-			unit->total=0;
-			unit->len=0;
+			unit->buffer = NULL;
+			unit->total = 0;
+			unit->len = 0;
 		}
 	}
 	if(!unit->buffer){
-		unit->buffer=(char *)malloc_impl(len);
-		memset(unit->buffer,0,len);
-		unit->total=len;
+		unit->buffer = (char *)malloc_impl(len);
+		memset(unit->buffer, 0, len);
+		unit->total = len;
 	}
-	unit->time=timeGetTime();
+	unit->time = timeGetTime();
 }
 
-int merger_add(void* block,int start,char *data,int len){
-	struct merger_unit *unit=(struct merger_unit *)block;
+int merger_add(void * block, int start, char * data, int len){
+	struct merger_unit * unit = (struct merger_unit *)block;
 	
-	memcpy(unit->buffer+start,data,len);
-	unit->len+=len;
-	unit->time=timeGetTime();
+	memcpy(unit->buffer+start, data, len);
+	unit->len += len;
+	unit->time = timeGetTime();
 	return len;
 }
 
-int merger_get(void* block,merger_get_cb *cb,int id,void* addition){
-	struct merger_unit *unit=(struct merger_unit *)block;
+int merger_get(void * block, merger_get_cb * cb, int id, void * addition){
+	struct merger_unit * unit = (struct merger_unit *)block;
 
 	if(unit->buffer && unit->total==unit->len){
 		if(cb){
-			cb(unit->buffer,unit->total,id,addition);
+			cb(unit->buffer, unit->total, id, addition);
 		}
 		free_impl(unit->buffer);
-		unit->buffer=NULL;
-		unit->total=0;
-		unit->len=0;
+		unit->buffer = NULL;
+		unit->total = 0;
+		unit->len = 0;
 		return 0;
 	}
 	return -1;
 }
 
-uint merger_time(void* block){
+uint merger_time(void * block){
 	return ((struct merger_unit *)block)->time;
 }
 
-void merger_free(struct merger *un,void* block){
-	struct merger_unit *unit=(struct merger_unit *)block;
+void merger_free(struct merger * un, void * block){
+	struct merger_unit * unit = (struct merger_unit *)block;
 	_merger_lock(un);
 	if(unit->buffer){
 		free_impl(unit->buffer);
-		unit->buffer=NULL;
-		unit->total=0;
-		unit->len=0;
+		unit->buffer = NULL;
+		unit->total = 0;
+		unit->len = 0;
 	}
 	emc_queue_init(&unit->queue);
-	emc_queue_insert_tail(&un->idle,&unit->queue);
+	emc_queue_insert_tail(&un->idle, &unit->queue);
 	_merger_unlock(un);
 }

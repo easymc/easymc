@@ -121,28 +121,28 @@ struct monitor_data{
 // Thread callback function type
 typedef emc_result_t EMC_CALL emc_thread_cb(void *);
 // Thread function
-EMC_EXP int emc_thread(emc_thread_cb *cb,void *args);
+EMC_EXP int emc_thread(emc_thread_cb * cb, void * args);
 
 // Message function definition.
-EMC_EXP void *emc_msg_alloc(void *data,uint size);
+EMC_EXP void *emc_msg_alloc(void * data, uint size);
 // Initialize the message structure
-EMC_EXP void emc_msg_build(void *msg,const void *old);
+EMC_EXP void emc_msg_build(void * msg, const void * old);
 // Set the message mode
-EMC_EXP void emc_msg_set_mode(void *msg,ushort mode);
+EMC_EXP void emc_msg_set_mode(void * msg, ushort mode);
 // Get the message mode
-EMC_EXP ushort emc_msg_get_mode(void *msg);
+EMC_EXP ushort emc_msg_get_mode(void * msg);
 // Get the client id from message
-EMC_EXP int emc_msg_getid(void *msg);
+EMC_EXP int emc_msg_getid(void * msg);
 // Set to send or receive this message client id
-EMC_EXP void emc_msg_setid(void *msg,int id);
+EMC_EXP void emc_msg_setid(void * msg, int id);
 // Set the message additional data.[Returns additional data by monitoring SNDSUCC/SNDFAIL events]
-EMC_EXP void emc_msg_set_addition(void *msg,void *addition);
+EMC_EXP void emc_msg_set_addition(void * msg, void * addition);
 // Get the message length
-EMC_EXP int emc_msg_length(void *msg);
+EMC_EXP int emc_msg_length(void * msg);
 // Free the messsage
-EMC_EXP int emc_msg_free(void *msg);
+EMC_EXP int emc_msg_free(void * msg);
 // Get the message buffer
-EMC_EXP void *emc_msg_buffer(void *msg);
+EMC_EXP void *emc_msg_buffer(void * msg);
 
 
 // Equipment operation function definition
@@ -150,17 +150,17 @@ EMC_EXP int emc_device(void);
 EMC_EXP void emc_destory(int device);
 // Set the device's option,optval value greater than 0 add option,otherwise reduce option
 // opt can be a combination of multiple option
-EMC_EXP int emc_set(int device,int opt,void *optval,int optlen);
-EMC_EXP int emc_bind(int device,const char *ip,const ushort port);
-EMC_EXP int emc_connect(int device,ushort mode,const char *ip,const ushort port);
+EMC_EXP int emc_set(int device, int opt, void * optval, int optlen);
+EMC_EXP int emc_bind(int device, const char * ip, const ushort port);
+EMC_EXP int emc_connect(int device, ushort mode, const char * ip, const ushort port);
 // Control device,id is connected via monitor returns number.
-EMC_EXP int emc_control(int device,int id,int ctl);
+EMC_EXP int emc_control(int device, int id, int ctl);
 EMC_EXP int emc_close(int device);
 // After processing is complete message needs to call emc_msg_free() to release.
-EMC_EXP int emc_recv(int device,void **msg);
-EMC_EXP int emc_send(int device,void *msg,int flag);
+EMC_EXP int emc_recv(int device, void ** msg);
+EMC_EXP int emc_send(int device, void * msg, int flag);
 // Monitoring the device event
-EMC_EXP int emc_monitor(int device,struct monitor_data *data);
+EMC_EXP int emc_monitor(int device, struct monitor_data * data);
 
 #ifdef __cplusplus
 }

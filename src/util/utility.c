@@ -42,13 +42,13 @@ unsigned int timeGetTime(){
 }
 #endif
 
-int create_thread(emc_thread_cb *cb,void *args){
+int create_thread(emc_thread_cb * cb, void * args){
 	thread_t thrd = 0;
-	return thread_create(&thrd,NULL,cb,args);
+	return thread_create(&thrd, NULL, cb, args);
 }
 
-int emc_thread(emc_thread_cb *cb,void *args){
-	return create_thread(cb,args);
+int emc_thread(emc_thread_cb * cb, void * args){
+	return create_thread(cb, args);
 }
 
 unsigned int get_thread_id(){
@@ -60,20 +60,20 @@ unsigned int get_thread_id(){
 }
 
 unsigned int check_local_machine(int ip){
-	char name[PATH_LEN]={0};
-	struct hostent *ent=NULL;
-	int index=0;
+	char name[PATH_LEN] = {0};
+	struct hostent * ent = NULL;
+	int index = 0;
 
-	if(LOOPBACK==ip)return 1;
-	if(gethostname(name,PATH_LEN) < 0){
+	if(LOOPBACK == ip) return 1;
+	if(gethostname(name, PATH_LEN) < 0){
 		return 0;
 	}
-	ent=gethostbyname(name);
+	ent = gethostbyname(name);
 	if(!ent){
 		return 0;
 	}
-	for(index=0;ent->h_addr_list[index];index++){
-		if(ip==((struct sockaddr_in *)ent->h_addr_list[index])->sin_addr.s_addr){
+	for(index=0; ent->h_addr_list[index]; index++){
+		if(ip == ((struct sockaddr_in *)ent->h_addr_list[index])->sin_addr.s_addr){
 			return 1;
 		}
 	}
@@ -83,7 +83,7 @@ unsigned int check_local_machine(int ip){
 //获取服务器的cpu个数
 uint get_cpu_num(){
 #if defined (EMC_WINDOWS)
-	SYSTEM_INFO sysInfo={0};
+	SYSTEM_INFO sysInfo = {0};
 	GetSystemInfo(&sysInfo);
 	return sysInfo.dwNumberOfProcessors/2;
 #else
@@ -101,14 +101,14 @@ void micro_wait(int64 microseconds){
 
 	if(!QueryPerformanceFrequency(&freq))
 		return;
-	timeout=freq.QuadPart*microseconds/1000/1000; 
-	QueryPerformanceCounter (&timestart); 
-	timestop=timestart; 
+	timeout = freq.QuadPart*microseconds/1000/1000; 
+	QueryPerformanceCounter(&timestart); 
+	timestop = timestart; 
 	while(timestop.QuadPart-timestart.QuadPart < timeout){ 
 		QueryPerformanceCounter(&timestop); 
 	}
 #else
-	struct timespec ts={0,microseconds};
-	nanosleep(&ts,NULL);
+	struct timespec ts = {0,microseconds};
+	nanosleep(&ts, NULL);
 #endif
 }

@@ -36,7 +36,7 @@ extern "C" {
 #ifndef _WIN32
 	unsigned int timeGetTime();
 #endif
-	int create_thread(emc_thread_cb *cb,void *args);
+	int create_thread(emc_thread_cb * cb, void * args);
 
 	unsigned int get_thread_id();
 
