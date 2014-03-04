@@ -747,7 +747,7 @@ static emc_result_t EMC_CALL tcp_work_cb(void * args){
 			}
 		}
 #else
-		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, 100);
+		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, -1);
 		if(retval > 0){
 			int j = 0;
 			for (j=0; j<retval; j++){
