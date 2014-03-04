@@ -141,7 +141,7 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 	struct emc_queue * head = NULL;
 	lock_hashmap(m);
 	hash=id&(m->size-1);
-	o = m->hash[hash];
+	n = m->hash[hash];
 	head = emc_queue_head(&m->queue);
 	if(!head){
 		unlock_hashmap(m);
@@ -151,6 +151,7 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 	o = emc_queue_data(head, struct node, queue);
 	o->id = id;
 	o->addr = addr;
+	o->next = NULL;
 	if(n){
 		while(n){
 			if(!n->next){
@@ -175,33 +176,25 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 void hashmap_erase(struct hashmap * m, int id)
 {
 	int hash = -1;
-	struct node *next = NULL;
-	struct node *n = NULL;
+	struct node * n = NULL, * prev = NULL;
 	lock_hashmap(m);
-	hash=id&(m->size-1);
+	hash = id&(m->size-1);
 	n = m->hash[hash];
 	while(n){
 		if (n->id == id){
-			if (n->next == NULL){
-				n->addr = NULL;
-				n->id = -1;
-				emc_queue_init(&n->queue);
-				emc_queue_insert_tail(&m->queue, &n->queue);
-				m->hash[hash] = NULL;
-				unlock_hashmap(m);
-				return;
+			n->addr = NULL;
+			n->id = -1;
+			if(n == m->hash[hash]){
+				m->hash[hash] = n->next;
+			}else{
+				prev->next = n->next;
 			}
-			next = n->next;
-			n->addr = next->addr;
-			n->id = next->id;
-			n->next = next->next;
-			next->id = -1;
-			next->next = NULL;
-			emc_queue_init(&next->queue);
-			emc_queue_insert_tail(&m->queue, &next->queue);
-			unlock_hashmap(m);
-			return;
+			n->next = NULL;
+			emc_queue_init(&n->queue);
+			emc_queue_insert_tail(&m->queue, &n->queue);
+			break;
 		}
+		prev = n;
 		n = n->next;
 	}
 	unlock_hashmap(m);

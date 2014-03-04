@@ -131,7 +131,7 @@ int sockhash_insert(struct sockhash * m, int fd, int id) {
 	struct emc_queue* head=NULL;
 	lock_hash(m);
 	hash = fd & (m->size-1);
-	o = m->hash[hash];
+	n = m->hash[hash];
 	head = emc_queue_head(&m->queue);
 	if(!head){
 		unlock_hash(m);
@@ -141,6 +141,7 @@ int sockhash_insert(struct sockhash * m, int fd, int id) {
 	o = emc_queue_data(head,struct node,queue);
 	o->fd = fd;
 	o->id = id;
+	o->next = NULL;
 	if(n){
 		while(n){
 			if(!n->next){
@@ -165,36 +166,25 @@ int sockhash_insert(struct sockhash * m, int fd, int id) {
 void sockhash_erase(struct sockhash * m, int fd)
 {
 	int hash = -1;
-	struct node * next = NULL;
-	struct node * n = NULL;
+	struct node * n = NULL, * prev = NULL;
 	lock_hash(m);
 	hash = fd & (m->size-1);
 	n = m->hash[hash];
-	while(n)
-	{
-		if (n->fd == fd)
-		{
-			if (n->next == NULL)
-			{
-				n->fd = -1;
-				n->id = -1;
-				emc_queue_init(&n->queue);
-				emc_queue_insert_tail(&m->queue, &n->queue);
-				m->hash[hash] = NULL;
-				unlock_hash(m);
-				return;
+	while(n) {
+		if (n->fd == fd) {
+			n->fd = -1;
+			n->id = -1;
+			if(n == m->hash[hash]){
+				m->hash[hash] = n->next;
+			}else{
+				prev->next = n->next;
 			}
-			next = n->next;
-			n->fd = next->fd;
-			n->id = next->id;
-			n->next = next->next;
-			next->fd = -1;
-			next->next = NULL;
-			emc_queue_init(&next->queue);
-			emc_queue_insert_tail(&m->queue, &next->queue);
-			unlock_hash(m);
-			return;
+			n->next = NULL;
+			emc_queue_init(&n->queue);
+			emc_queue_insert_tail(&m->queue, &n->queue);
+			break;
 		}
+		prev = n;
 		n = n->next;
 	}
 	unlock_hash(m);
