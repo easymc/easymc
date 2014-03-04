@@ -108,7 +108,7 @@ void micro_wait(int64 microseconds){
 		QueryPerformanceCounter(&timestop); 
 	}
 #else
-	struct timespec ts = {0,microseconds};
+	struct timespec ts = {0,microseconds * 1000};
 	nanosleep(&ts, NULL);
 #endif
 }

@@ -127,6 +127,8 @@ struct tcp_client{
 	char					ip[ADDR_LEN];
 	ushort					port;
 	uint					connected;
+	// Connection process is completed
+	volatile uint			completed;
 #if defined (EMC_WINDOWS)
 	struct tcp_overlapped	olr;
 #endif
@@ -330,7 +332,14 @@ static void tcp_merger_cb(char * data, int len, int id, void * addition){
 	if(client && msg){
 		emc_msg_setid(msg, id);
 		emc_msg_set_mode(msg, client->mode);
-		if(push_device_message(tcp_->device, msg) < 0){
+		if(!client->completed){
+			micro_wait(1000);
+			if(!client->completed){
+				emc_msg_free(msg);
+				msg = NULL;
+			}
+		}
+		if(msg && push_device_message(tcp_->device, msg) < 0){
 			emc_msg_free(msg);
 		}
 	}
@@ -355,7 +364,14 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 				if(msg){
 					emc_msg_setid(msg, id);
 					emc_msg_set_mode(msg, client->mode);
-					if(push_device_message(area->tcp_->device, msg) < 0){
+					if(!client->completed){
+						micro_wait(1000);
+						if(!client->completed){
+							emc_msg_free(msg);
+							msg = NULL;
+						}
+					}
+					if(msg && push_device_message(area->tcp_->device, msg) < 0){
 						emc_msg_free(msg);
 					}
 				}
@@ -664,6 +680,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 	client->fd = fd;
 	client->area = area;
 	client->id = global_get_connect_id();
+	client->completed = 0;
 #if !defined (EMC_WINDOWS)
 	if(sockhash_insert(tcp_->hash, client->fd, client->id) < 0){
 		global_idle_connect_id(client->id);
@@ -703,6 +720,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 	client->connected = 1;
 	area->count ++;
 	tcp_post_monitor(tcp_, client, EMC_EVENT_ACCEPT, NULL);
+	tcp_number_add(&client->completed);
 	return 0;
 }
 
@@ -885,6 +903,7 @@ static int init_tcp_client(struct tcp * tcp_){
 		tcp_->client->id = global_get_connect_id();
 	}
 
+	tcp_->client->completed = 0;
 	tcp_->client->fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(tcp_->client->fd < 0){
 		return -1;
@@ -996,6 +1015,7 @@ static int init_tcp_client(struct tcp * tcp_){
 	strncpy(tcp_->client->ip, inet_ntoa(addr.sin_addr), ADDR_LEN);
 	tcp_->client->port = ntohs(addr.sin_port);
 	tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_CONNECT, NULL);
+	tcp_number_add(&tcp_->client->completed);
 	return 0;
 }
 

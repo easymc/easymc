@@ -310,6 +310,9 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 					emc_msg_setid(msg, id);
 					emc_msg_set_mode(msg, client->mode);
 				}
+			}else{
+				emc_msg_free(msg);
+				msg = NULL;
 			}
 		}else if(EMC_REMOTE == ipc_->type){
 			ipc_->client->time = timeGetTime();
