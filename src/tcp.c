@@ -333,7 +333,7 @@ static void tcp_merger_cb(char * data, int len, int id, void * addition){
 		emc_msg_setid(msg, id);
 		emc_msg_set_mode(msg, client->mode);
 		if(!client->completed){
-			micro_wait(1000);
+			nsleep(1);
 			if(!client->completed){
 				emc_msg_free(msg);
 				msg = NULL;
@@ -365,7 +365,7 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 					emc_msg_setid(msg, id);
 					emc_msg_set_mode(msg, client->mode);
 					if(!client->completed){
-						micro_wait(1000);
+						nsleep(1);
 						if(!client->completed){
 							emc_msg_free(msg);
 							msg = NULL;
