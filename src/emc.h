@@ -66,8 +66,8 @@ typedef uint		emc_result_t;
 #define EMC_BIND	__cdecl
 #else
 typedef void*		emc_result_t;
-#define EMC_CALL
-#define EMC_BIND
+#define EMC_CALL	__attribute__((__stdcall__))
+#define EMC_BIND	__attribute__((__cdecl__))
 #endif
 
 // Monitoring response data type
