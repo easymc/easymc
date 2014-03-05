@@ -62,6 +62,7 @@ void *global_alloc_monitor();
 void global_free_monitor(void * data);
 
 int global_add_reconnect(int id, on_reconnect_cb *cb, void * client, void * addition);
+void global_free_reconnect(int id);
 
 int global_rand_number();
 

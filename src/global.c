@@ -33,11 +33,11 @@
 #include "util/hashmap.h"
 #include "util/unpack.h"
 #include "util/merger.h"
-#include "util/heap.h"
 #include "util/pqueue.h"
 #include "util/sendqueue.h"
 #include "util/map.h"
 #include "util/utility.h"
+#include "util/memory/jemalloc.h"
 #include "global.h"
 
 #define GLOBAL_DEVICE_DEFAULT	4096
@@ -59,10 +59,6 @@ struct global{
 	struct sendqueue	*sq;
 	// Reconnect map
 	struct map			*rcmq;
-	// reconnect struct heap
-	struct heap			*rcheap;
-	// monitor heap
-	struct heap			*mtheap;
 	// exit
 	volatile uint		exit;
 };
@@ -109,8 +105,6 @@ static void global_init(void){
 		}
 		self.sq = create_sendqueue();
 		self.rcmq = create_map(EMC_SOCKETS_DEFAULT);
-		self.rcheap = heap_new(sizeof(struct reconnect), EMC_SOCKETS_DEFAULT);
-		self.mtheap = heap_new(sizeof(struct monitor_data), EMC_SOCKETS_DEFAULT);
 		srand((uint)time(NULL));
 		create_thread(global_reconnect_cb, NULL);
 	}
@@ -131,10 +125,6 @@ void global_term(void){
 	self.sq = NULL;
 	delete_map(self.rcmq);
 	self.rcmq = NULL;
-	heap_delete(self.rcheap);
-	self.rcheap = NULL;
-	heap_delete(self.mtheap);
-	self.mtheap = NULL;
 }
 
 int global_add_device(void * device_){
@@ -210,25 +200,35 @@ unsigned int global_sendqueue_size(int id){
 }
 
 int global_add_reconnect(int id, on_reconnect_cb * cb, void * client, void * addition){
-	struct reconnect * rc = (struct reconnect *)heap_alloc(self.rcheap);
+	struct reconnect * rc = (struct reconnect *)malloc_impl(sizeof(struct reconnect));
 	if(!rc)return -1;
 	rc->cb = cb;
 	rc->client = client;
 	rc->addition = addition;
 	if(map_add(self.rcmq, id, rc) < 0){
-		heap_free(self.rcheap, rc);
+		free_impl(rc);
 		return -1;
 	}
 	return 0;
 }
 
+void global_free_reconnect(int id){
+	struct reconnect * rc = NULL;
+	if(0==map_get(self.rcmq, id, (void **)&rc)){
+		if(rc){
+			free_impl(rc);
+		}
+		map_erase(self.rcmq, id);
+	}
+}
+
 void *global_alloc_monitor(){
-	return heap_alloc(self.mtheap);
+	return malloc_impl(sizeof(struct monitor_data));
 }
 
 void global_free_monitor(void *data){
 	if(data){
-		heap_free(self.mtheap,data);
+		free_impl(data);
 	}
 }
 

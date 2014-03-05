@@ -54,7 +54,6 @@ set (	EMC_SOURCES
 	util/queue.h
 	util/ringqueue.h
 	util/event.h
-	util/heap.h
 	util/pqueue.h
 	util/thread.h
 	util/utility.h
@@ -76,7 +75,6 @@ set (	EMC_SOURCES
 	util/hashmap.c
 	util/ringqueue.c
 	util/event.c
-	util/heap.c
 	util/pqueue.c
 	util/thread.c
 	util/utility.c

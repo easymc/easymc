@@ -33,7 +33,6 @@
 #include "util/utility.h"
 #include "util/sockhash.h"
 #include "util/unpack.h"
-#include "util/heap.h"
 #include "util/sendqueue.h"
 #include "util/merger.h"
 #include "util/event.h"
@@ -114,7 +113,6 @@ struct tcp_server{
 	//socket handle
 	int					fd;
 	struct hashmap		*connection;
-	struct heap			*client_heap;
 	struct tcp_area		*area;
 };
 
@@ -463,7 +461,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	if(EMC_LOCAL == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
 		global_idle_connect_id(client->id);
-		heap_free(tcp_->server->client_heap, client);
+		free_impl(client);
 		hashmap_erase(tcp_->server->connection, id);
 	}else if(EMC_REMOTE == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
@@ -670,7 +668,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		_close_socket(fd);
 		return -1;
 	}
-	client = (struct tcp_client*)heap_alloc(tcp_->server->client_heap);
+	client = (struct tcp_client*)malloc_impl(sizeof(struct tcp_client));
 	if(!client){
 		_close_socket(fd);
 		return -1;
@@ -694,7 +692,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		sockhash_erase(tcp_->hash, client->fd);
 #endif
 		global_idle_connect_id(client->id);
-		heap_free(tcp_->server->client_heap, client);
+		free_impl(client);
 		_close_socket(fd);
 		return -1;
 	}
@@ -713,7 +711,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		sockhash_erase(tcp_->hash, client->fd);
 #endif
 		global_idle_connect_id(client->id);
-		heap_free(tcp_->server->client_heap, client);
+		free_impl(client);
 		_close_socket(fd);
 		return -1;
 	}
@@ -851,7 +849,6 @@ static int init_tcp_server(struct tcp * tcp_){
 		return -1;
 	}
 	tcp_->server->connection  = hashmap_new(EMC_SOCKETS_DEFAULT);
-	tcp_->server->client_heap = heap_new(sizeof(struct tcp_client), EMC_SOCKETS_DEFAULT);
 	tcp_->server->area = (struct tcp_area *)malloc(sizeof(struct tcp_area) * get_cpu_num());
 	memset(tcp_->server->area, 0, sizeof(struct tcp_area) * get_cpu_num());
 	for(flag=0; flag<get_cpu_num(); flag++){
@@ -1113,10 +1110,10 @@ void delete_tcp(struct tcp * tcp_){
 			}
 			nsleep(100);
 			hashmap_delete(tcp_->server->connection);
-			heap_delete(tcp_->server->client_heap);
 			free(tcp_->server->area);
 			free(tcp_->server);
 		}else if(EMC_REMOTE == tcp_->type){
+			global_free_reconnect(tcp_->client->id);
 			_close_socket(tcp_->client->fd);
 #if defined (EMC_WINDOWS)
 			CloseHandle(tcp_->client->area->fd);

@@ -30,11 +30,11 @@
 #include "emc.h"
 #include "util/map.h"
 #include "util/merger.h"
-#include "util/heap.h"
 #include "util/utility.h"
 #include "util/ringqueue.h"
 #include "util/ringbuffer.h"
 #include "util/ringarray.h"
+#include "util/memory/jemalloc.h"
 #include "global.h"
 #include "common.h"
 #include "device.h"
@@ -55,8 +55,6 @@
 
 struct ipc_server{
 	struct map	*connection;
-	// ipc_client distributor
-	struct heap	*client_heap;
 };
 
 struct ipc_client{
@@ -115,8 +113,6 @@ struct ipc{
 	struct map			*rmap;
 	// Send queue
 	struct ringqueue	*sq;
-	// Send queue data heap
-	struct heap			*send_heap;
 	struct	ipc_server	*server;
 	struct	ipc_client	*client;
 	struct ipc_client	*reconnect;
@@ -208,7 +204,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 			ushort mode = *(ushort *)data;
 
 			// Process new ipc connections
-			client = (struct ipc_client *)heap_alloc(ipc_->server->client_heap);
+			client = (struct ipc_client *)malloc_impl(sizeof(struct ipc_client));
 			if(client){
 				client->mode = mode;
 				client->id = global_get_connect_id();
@@ -218,14 +214,14 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 				client->evt = OpenSemaphore(SEMAPHORE_ALL_ACCESS,TRUE,name);
 				if(!client->evt){
 					global_idle_connect_id(client->id);
-					heap_free(ipc_->server->client_heap, client);
+					free_impl(client);
 					return;
 				}
 #else
 				client->evt = semget(*(uint *)(data+sizeof(ushort)),0,IPC_CREAT|0600);
 				if(client->evt<0){
 					global_idle_connect_id(client->id);
-					heap_free(ipc_->server->client_heap, client);
+					free_impl(client);
 					return ;
 				}
 #endif
@@ -247,7 +243,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 #else
 					semctl(client->evt, 0, IPC_RMID, NULL);
 #endif
-					heap_free(ipc_->server->client_heap, client);
+					free_impl(client);
 				}else{
 					client->connected = 1;
 					client->time = timeGetTime();
@@ -259,7 +255,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 #else
 						semctl(client->evt, 0, IPC_RMID, NULL);
 #endif
-						heap_free(ipc_->server->client_heap, client);
+						free_impl(client);
 					}
 				}
 				// If you set the monitor to throw on accept events
@@ -295,7 +291,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 				if(0 == map_erase(ipc_->server->connection, id)){
 					push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 					global_idle_connect_id(id);
-					heap_free(ipc_->server->client_heap, client);
+					free_impl(client);
 				}
 			}
 		}else if(EMC_REMOTE == ipc_->type){
@@ -655,7 +651,7 @@ static uint ipc_send_pub_foreach_cb(struct map * m, int64 key, void * p, void * 
 		struct ipc * ipc_ = unit->ipc_;
 		struct ipc_data * data = NULL;
 
-		data = (struct ipc_data *)heap_alloc(ipc_->send_heap);
+		data = (struct ipc_data *)malloc_impl(sizeof(struct ipc_data));
 		if(data){
 			data->id = key;
 			data->ipc_ = ipc_;
@@ -664,7 +660,7 @@ static uint ipc_send_pub_foreach_cb(struct map * m, int64 key, void * p, void * 
 			emc_msg_ref_add(unit->msg);
 			if(push_ringqueue(ipc_->sq, data) < 0){
 				emc_msg_ref_dec(unit->msg);
-				heap_free(ipc_->send_heap, data);
+				free_impl(data);
 			}
 		}
 	}
@@ -752,7 +748,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 				push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 				global_idle_connect_id(client->id);
 				client->connected = 0;
-				heap_free(ipc_->server->client_heap, client);
+				free_impl(client);
 				return 1;
 			}
 		}
@@ -864,7 +860,7 @@ static emc_result_t EMC_CALL ipc_send_cb(void * args){
 			if(EMC_NOWAIT == data->flag){
 				emc_msg_free(data->msg);
 			}
-			heap_free(ipc_->send_heap, data);
+			free_impl(data);
 		}
 	}
 #if defined (EMC_WINDOWS)
@@ -943,7 +939,6 @@ static int init_ipc_server(struct ipc * ipc_){
 	}
 #endif
 	ipc_->server->connection = create_map(EMC_SOCKETS_DEFAULT);
-	ipc_->server->client_heap = heap_new(sizeof(struct ipc_client), IPC_HEAP_SIZE);
 	return 0;
 }
 
@@ -1133,7 +1128,6 @@ struct ipc * create_ipc(uint ip, ushort port, int device, unsigned short mode, i
 	}
 	ipc_->sq = create_ringqueue(_RQ_M);
 	ipc_->rmap = create_map(EMC_SOCKETS_DEFAULT);
-	ipc_->send_heap = heap_new(sizeof(struct ipc_data), EMC_SOCKETS_DEFAULT);
 	create_thread(ipc_work_cb,ipc_);
 	create_thread(ipc_check_cb,ipc_);
 	create_thread(ipc_send_cb,ipc_);
@@ -1149,7 +1143,6 @@ void delete_ipc(struct ipc * ipc_){
 			map_foreach(ipc_->server->connection, map_foreach_logout_cb, ipc_);
 			term_ipc(ipc_);
 			delete_map(ipc_->server->connection);
-			heap_delete(ipc_->server->client_heap);
 			free(ipc_->server);
 		}else if(EMC_REMOTE == ipc_->type){
 			write_ipc_data(ipc_, ipc_->client, ipc_->client->id, EMC_CMD_LOGOUT,NULL, 0);
@@ -1158,7 +1151,6 @@ void delete_ipc(struct ipc * ipc_){
 		}
 		delete_ringqueue(ipc_->sq);
 		delete_map(ipc_->rmap);
-		heap_delete(ipc_->send_heap);
 		free(ipc_);
 	}
 }
@@ -1183,7 +1175,7 @@ int close_ipc(struct ipc * ipc_, int id){
 	if(0 == map_erase(ipc_->server->connection, id)){
 		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 		global_idle_connect_id(id);
-		heap_free(ipc_->server->client_heap, client);
+		free_impl(client);
 	}
 	return 0;
 }
@@ -1205,11 +1197,11 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		void * msg_r = NULL;
 		struct ipc_data * data = NULL;
 		
-		data = (struct ipc_data *)heap_alloc(ipc_->send_heap);
+		data = (struct ipc_data *)malloc_impl(sizeof(struct ipc_data));
 		if(!data) return -1;
 		msg_r=emc_msg_alloc(emc_msg_buffer(msg), emc_msg_length(msg));
 		if(!msg_r){
-			heap_free(ipc_->send_heap, data);
+			free_impl(data);
 			return -1;
 		}
 		emc_msg_build(msg_r,msg);
@@ -1220,7 +1212,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		emc_msg_ref_add(msg_r);
 		if(EMC_PUB != emc_msg_get_mode(msg_r)){
 			if(push_ringqueue(ipc_->sq, data) < 0){
-				heap_free(ipc_->send_heap, data);
+				free_impl(data);
 				emc_msg_free(msg_r);
 				return -1;
 			}
