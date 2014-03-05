@@ -30,7 +30,7 @@
 #define __EMC_H_INCLUDED__
 
 // Version control(current version 0.1)
-#define EMC_VERSION 0.1
+#define EMC_VERSION 0.2
 
 #ifdef __cplusplus
 extern "C" {
