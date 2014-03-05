@@ -682,7 +682,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 #if !defined (EMC_WINDOWS)
 	if(sockhash_insert(tcp_->hash, client->fd, client->id) < 0){
 		global_idle_connect_id(client->id);
-		heap_free(tcp_->server->client_heap, client);
+		free_impl(client);
 		_close_socket(fd);
 		return -1;
 	}
@@ -701,7 +701,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		tcp_del_event(tcp_, area, fd);
 		sockhash_erase(tcp_->hash, client->fd);
 		global_idle_connect_id(client->id);
-		heap_free(tcp_->server->client_heap, client);
+		free_impl(client);
 		_close_socket(fd);
 		return -1;
 	}
