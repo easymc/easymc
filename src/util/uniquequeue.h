@@ -39,8 +39,8 @@ extern "C"{
 
 	struct uniquequeue * create_uqueue();
 	void				delete_uqueue(struct uniquequeue * uq);
-	unsigned int		push_uqueue(struct uniquequeue * uq, int v);
-	int					pop_uqueue(struct uniquequeue * uq);
+	unsigned int		push_uqueue(struct uniquequeue * uq, int v, void * p);
+	int					pop_uqueue(struct uniquequeue * uq, void ** p);
 	int					wait_uqueue(struct uniquequeue * uq);
 	void				post_uqueue(struct uniquequeue * uq);
 

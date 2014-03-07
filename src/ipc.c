@@ -38,6 +38,7 @@
 #include "global.h"
 #include "common.h"
 #include "device.h"
+#include "plug.h"
 #include "msg.h"
 #include "ipc.h"
 
@@ -92,6 +93,8 @@ struct ipc_data{
 struct ipc{
 	// Device ID
 	int					device;
+	// plug id
+	int					plug;
 	// IPC type: local / remote
 	int					type;
 
@@ -179,6 +182,7 @@ static void ipc_post_monitor(struct ipc * ipc_, struct ipc_client * client, int 
 	if(get_device_monitor(ipc_->device)){
 		struct monitor_data * md = (struct monitor_data *)global_alloc_monitor();
 		if(md){
+			md->plug = ipc_->plug;
 			md->events = evt;
 			if(client){
 				md->id = client->id;
@@ -314,11 +318,11 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 			ipc_->client->time = timeGetTime();
 			if(msg){
 				emc_msg_setid(msg, id);
-				emc_msg_set_mode(msg, get_device_mode(ipc_->device));
+				emc_msg_set_mode(msg, get_plug_mode(ipc_->plug));
 			}
 		}
 		if(msg){
-			if(push_device_message(ipc_->device, msg) < 0){
+			if(push_plug_message(ipc_->plug, msg) < 0){
 				emc_msg_free(msg);
 			}
 		}
@@ -678,6 +682,7 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 			emc_msg_set_mode(msg, EMC_REP);
 		}
 		if(EMC_SUB == emc_msg_get_mode(msg)){
+			errno = EMODE;
 			return -1;
 		}
 	}
@@ -698,6 +703,7 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 	case EMC_REP:
 		{
 			if(map_get(ipc_->server->connection, emc_msg_getid(msg), (void**)&client) < 0){
+				errno = ENOEXIST;
 				return -1;
 			}
 			if(write_ipc_data(ipc_, client, emc_msg_getid(msg), EMC_CMD_DATA,
@@ -1081,18 +1087,23 @@ static int init_ipc_client(struct ipc * ipc_){
 	return 0;
 }
 
-struct ipc * create_ipc(uint ip, ushort port, int device, unsigned short mode, int type){
+struct ipc * create_ipc(uint ip, ushort port, int device, int plug, unsigned short mode, int type){
 	struct ipc * ipc_=(struct ipc *)malloc(sizeof(struct ipc));
-	if(!ipc_) return NULL;
+	if(!ipc_) {
+		errno = ENOMEM;
+		return NULL;
+	}
 	memset(ipc_, 0, sizeof(struct ipc));
 	ipc_->ip = ip;
 	ipc_->port = port;
 	ipc_->type = type;
 	ipc_->device = device;
+	ipc_->plug = plug;
 	if(EMC_LOCAL == type){
 		ipc_->server = (struct ipc_server *)malloc(sizeof(struct ipc_server));
 		if(!ipc_->server){
 			free(ipc_);
+			errno = ENOMEM;
 			return NULL;
 		}
 		memset(ipc_->server, 0, sizeof(struct ipc_server));
@@ -1182,13 +1193,17 @@ int close_ipc(struct ipc * ipc_, int id){
 
 int send_ipc(struct ipc * ipc_, void * msg, int flag){
 	if(!ipc_ || !msg){
+		errno = EINVAL;
 		return -1;
 	}
 	switch(emc_msg_get_mode(msg)){
 	case EMC_SUB:
 	case EMC_REQ:
 		if(EMC_REMOTE == ipc_->type){
-			if(!ipc_->client->connected) return -1;
+			if(!ipc_->client->connected) {
+				errno = ENOLIVE;
+				return -1;
+			}
 			emc_msg_setid(msg, ipc_->client->id);
 		}
 		break;
@@ -1202,6 +1217,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		msg_r=emc_msg_alloc(emc_msg_buffer(msg), emc_msg_length(msg));
 		if(!msg_r){
 			free_impl(data);
+			errno = ENOMEM;
 			return -1;
 		}
 		emc_msg_build(msg_r,msg);
@@ -1214,6 +1230,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 			if(push_ringqueue(ipc_->sq, data) < 0){
 				free_impl(data);
 				emc_msg_free(msg_r);
+				errno = EQUEUE;
 				return -1;
 			}
 		}else{

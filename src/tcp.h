@@ -33,8 +33,12 @@
 extern "C"{
 #endif
 
+struct tcp_mgr;
 struct tcp;
-struct tcp * create_tcp(unsigned int ip, unsigned short port, int device, unsigned short mode, int type);
+
+struct tcp_mgr * create_tcp_mgr(int device, int thread);
+struct tcp * add_tcp(unsigned int ip, unsigned short port, unsigned short mode, int type, int plug, struct tcp_mgr * mgr);
+void delete_tcp_mgr(struct tcp_mgr * mgr);
 void delete_tcp(struct tcp *);
 int close_tcp(struct tcp *,int);
 int send_tcp(struct tcp *,void *,int);

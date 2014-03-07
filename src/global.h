@@ -42,6 +42,10 @@ int global_add_device(void * device_);
 void *global_get_device(int id);
 void global_erase_device(int id);
 
+int global_add_plug(void * plug);
+void *global_get_plug(int id);
+void global_erase_plug(int id);
+
 void *global_alloc_merger();
 void global_free_merger(void *);
 

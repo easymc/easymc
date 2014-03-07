@@ -26,19 +26,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __EMC_IPC_H_INCLUDED__
-#define __EMC_IPC_H_INCLUDED__
+
+#ifndef __EMC_PLUG_H_INCLUDED__
+#define __EMC_PLUG_H_INCLUDED__
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-struct ipc;
-
-struct ipc * create_ipc(unsigned int ip, unsigned short port, int device, int plug, unsigned short mode, int type);
-void delete_ipc(struct ipc *);
-int close_ipc(struct ipc *,int);
-int send_ipc(struct ipc *, void * msg, int flag);
+	ushort get_plug_mode(int plug);
+	int push_plug_message(int plug, void * msg);
 
 #ifdef __cplusplus
 }

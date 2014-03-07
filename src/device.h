@@ -33,14 +33,17 @@
 extern "C"{
 #endif
 
-	ushort get_device_mode(int id);
+	struct tcp_mgr * get_device_tcp_mgr(int id);
+	void set_device_tcp_mgr(int id, struct tcp_mgr *mgr);
+	uint get_device_thread(int id);
 	// The device is monitoring events
 	uint get_device_monitor(int id);
 	// Whether the device can be controlled
 	uint get_device_control(int id);
-	int push_device_message(int id, void * msg);
 	int push_device_event(int id, void * data);
 
+	int add_device_plug(int id, int plug, void * p);
+	void del_device_plug(int id, int plug);
 #ifdef __cplusplus
 }
 #endif

@@ -41,6 +41,7 @@ set (	EMC_SOURCES
 	global.h
 	device.h
 	msg.h
+	plug.h
 	common.h
 	util/memory/jemalloc.h
 	util/memory/jemalloc_config.h
@@ -72,6 +73,7 @@ set (	EMC_SOURCES
 	device.c
 	tcp.c
 	global.c
+	plug.c
 	util/hashmap.c
 	util/ringqueue.c
 	util/event.c

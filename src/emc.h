@@ -29,8 +29,8 @@
 #ifndef __EMC_H_INCLUDED__
 #define __EMC_H_INCLUDED__
 
-// Version control(current version 0.1)
-#define EMC_VERSION 0.2
+// Version control
+#define EMC_VERSION 0.3
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,8 +70,76 @@ typedef void*		emc_result_t;
 #define EMC_BIND	__attribute__((__cdecl__))
 #endif
 
+/* Errors */
+
+// Custom errno range starting value
+#define EMC_CUSTOM_ERRNO	-214748360
+
+/* some standard POSIX errnos are not defined */
+#ifndef EUSERS
+#define EUSERS	(EMC_CUSTOM_ERRNO-1)
+#define EMC_EUSERS_DEFINED
+#endif
+
+#ifndef ENOPLUG
+#define ENOPLUG	(EMC_CUSTOM_ERRNO-2)
+#define EMC_ENOPLUG_DEFINED
+#endif
+
+#ifndef EREBIND
+#define EREBIND	(EMC_CUSTOM_ERRNO-3)
+#define EMC_EREBIND_DEFINED
+#endif
+
+#ifndef ENOSOCK
+#define ENOSOCK (EMC_CUSTOM_ERRNO-4)
+#define EMC_ENOSOCK_DEFINED
+#endif
+
+#ifndef ENOLIVE
+#define ENOLIVE (EMC_CUSTOM_ERRNO-5)
+#define EMC_ENOLIVE_DEFINED
+#endif
+
+#ifndef EQUEUE
+#define EQUEUE	(EMC_CUSTOM_ERRNO-6)
+#define EMC_EQUEUE_DEFINED
+#endif
+
+#ifndef EMODE
+#define EMODE	(EMC_CUSTOM_ERRNO-7)
+#define EMC_EMODE_DEFINED
+#endif
+
+#ifndef ENOEXIST
+#define ENOEXIST (EMC_CUSTOM_ERRNO-8)
+#define EMC_ENOEXIST_DEFINED
+#endif
+
+#ifndef ENODEVICE
+#define ENODEVICE	(EMC_CUSTOM_ERRNO-9)
+#define EMC_ENODEVICE_DEFINED
+#endif
+
+#ifndef EINVAL
+#define EINVAL	(EMC_CUSTOM_ERRNO-10)
+#define EMC_EINVAL_DEFINED
+#endif
+
+#ifndef ENOMEM
+#define ENOMEM	(EMC_CUSTOM_ERRNO-11)
+#define EMC_ENOMEM_DEFINED
+#endif
+
+#ifndef ETIME
+#define ETIME	(EMC_CUSTOM_ERRNO-12)
+#define EMC_ETIME_DEFINED
+#endif
+
 // Monitoring response data type
 struct monitor_data{
+	// Monitoring messages from which plug
+	int		plug;
 	// The following are several types of events
 	int		events;
 	// A unique number for each connection
@@ -92,6 +160,7 @@ struct monitor_data{
 // easymc device operating parameters
 #define EMC_OPT_MONITOR			1	// Set the device to monitor events
 #define EMC_OPT_CONTROL			2	// Settings are available to control device
+#define EMC_OPT_THREAD			4	// Set the device thread number,valid only for tcp
 
 // easymc events type
 #define EMC_EVENT_ACCEPT		1	// Service to accept a new connection
@@ -119,6 +188,12 @@ struct monitor_data{
 #       define EMC_EXP
 #   endif
 #endif
+
+// Get the errorno from the library
+EMC_EXP int EMC_BIND emc_errno(void);
+
+// Returns the errorno description
+EMC_EXP const char * EMC_BIND emc_errno_str(int errn);
 
 // Thread callback function type
 typedef emc_result_t EMC_CALL emc_thread_cb(void *);
@@ -153,14 +228,17 @@ EMC_EXP void EMC_BIND emc_destory(int device);
 // Set the device's option,optval value greater than 0 add option,otherwise reduce option
 // opt can be a combination of multiple option
 EMC_EXP int EMC_BIND emc_set(int device, int opt, void * optval, int optlen);
-EMC_EXP int EMC_BIND emc_bind(int device, const char * ip, const ushort port);
-EMC_EXP int EMC_BIND emc_connect(int device, ushort mode, const char * ip, const ushort port);
+
+EMC_EXP int EMC_BIND emc_plug(int device);
+EMC_EXP int EMC_BIND emc_bind(int plug, const char * ip, const ushort port);
+EMC_EXP int EMC_BIND emc_connect(int plug, ushort mode, const char * ip, const ushort port);
 // Control device,id is connected via monitor returns number.
-EMC_EXP int EMC_BIND emc_control(int device, int id, int ctl);
-EMC_EXP int EMC_BIND emc_close(int device);
+EMC_EXP int EMC_BIND emc_control(int plug, int id, int ctl);
+EMC_EXP int EMC_BIND emc_close(int plug);
 // After processing is complete message needs to call emc_msg_free() to release.
-EMC_EXP int EMC_BIND emc_recv(int device, void ** msg);
-EMC_EXP int EMC_BIND emc_send(int device, void * msg, int flag);
+EMC_EXP int EMC_BIND emc_recv(int plug, void ** msg);
+EMC_EXP int EMC_BIND emc_send(int plug, void * msg, int flag);
+
 // Monitoring the device event
 EMC_EXP int EMC_BIND emc_monitor(int device, struct monitor_data * data);
 

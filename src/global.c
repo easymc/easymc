@@ -45,10 +45,14 @@
 struct global{
 	// Serial device, since the growth
 	volatile uint		device_serial;
+	// Serial plug, since the growth
+	volatile uint		plug_serial;
 	// Serial data, since the growth
 	volatile uint		data_serial;
 	// Record all the pointer device
 	struct hashmap		*devices;
+	// Record all the plug
+	struct hashmap		*plugs;
 	// Serial connection id, since the growth
 	struct pqueue		*id_allocator;
 	// Data consolidator
@@ -97,6 +101,7 @@ static void global_init(void){
 		WSAStartup(MAKEWORD(2, 2), &wsaData);
 #endif
 		self.devices = hashmap_new(GLOBAL_DEVICE_DEFAULT);
+		self.plugs = hashmap_new(GLOBAL_DEVICE_DEFAULT);
 		self.mg = merger_new(EMC_SOCKETS_DEFAULT);
 		self.upk = unpack_new(EMC_SOCKETS_DEFAULT);
 		self.id_allocator = create_pqueue();
@@ -117,6 +122,8 @@ void global_term(void){
 #endif
 	hashmap_delete(self.devices);
 	self.devices = NULL;
+	hashmap_delete(self.plugs);
+	self.plugs = NULL;
 	unpack_delete(self.upk);
 	self.upk = NULL;
 	delete_pqueue(self.id_allocator);
@@ -147,6 +154,29 @@ void global_erase_device(int id){
 	if(id >= 0 && id < GLOBAL_DEVICE_DEFAULT){
 		global_init();
 		hashmap_erase(self.devices,id);
+	}
+}
+
+int global_add_plug(void * plug){
+	int id = self.plug_serial;
+	global_init();
+	if(hashmap_insert(self.plugs, id, plug) < 0){
+		return -1;
+	}
+	self.plug_serial ++;
+	return id;
+}
+
+void * global_get_plug(int id){
+	if(id < 0) return NULL;
+	global_init();
+	return hashmap_search(self.plugs,id);
+}
+
+void global_erase_plug(int id){
+	if(id >= 0 && id < GLOBAL_DEVICE_DEFAULT){
+		global_init();
+		hashmap_erase(self.plugs,id);
 	}
 }
 

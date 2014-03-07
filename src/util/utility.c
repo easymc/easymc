@@ -112,3 +112,74 @@ void micro_wait(int64 microseconds){
 	nanosleep(&ts, NULL);
 #endif
 }
+
+int emc_errno(void){
+	return errno;
+}
+
+const char * emc_errno_str(int errn){
+	switch(errn){
+#ifdef EMC_EUSERS_DEFINED
+	case EUSERS:
+		return "Too many plug";
+#endif
+
+#ifdef EMC_ENOPLUG_DEFINED
+	case ENOPLUG:
+		return "No plug found";
+#endif
+
+#ifdef EMC_EREBIND_DEFINED
+	case EREBIND:
+		return "Rebind plug";
+#endif
+
+#ifdef EMC_ENOSOCK_DEFINED
+	case ENOSOCK:
+		return "Invalid socket";
+#endif
+
+#ifdef EMC_ENOLIVE_DEFINED
+	case ENOLIVE:
+		return "Invalid connection";
+#endif
+
+#ifdef EMC_EQUEUE_DEFINED
+	case EQUEUE:
+		return "Push queue error";
+#endif
+
+#ifdef EMC_EMODE_DEFINED
+	case EMODE:
+		return "Mismatched mode";
+#endif
+
+#ifdef EMC_ENOEXIST_DEFINED
+	case ENOEXIST:
+		return "Connection no exists";
+#endif
+
+#ifdef EMC_ENODEVICE_DEFINED
+	case ENODEVICE:
+		return "No device found";
+#endif
+
+#ifdef EMC_EINVAL_DEFINED
+	case EINVAL:
+		return "Invalid argument";
+#endif
+
+#ifdef EMC_ENOMEM_DEFINED
+	case ENOMEM:
+		return "Out of memory";
+#endif
+
+#ifdef EMC_ETIME_DEFINED
+	case ETIME:
+		return "Timer expired";
+#endif
+	default:
+		return strerror(errn);
+	}
+	return NULL;
+}

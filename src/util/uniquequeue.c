@@ -34,9 +34,13 @@
 #define MAX_ARRAY_SIZE	(0x10000)
 
 #pragma pack(1)
+struct uniquenode{
+	int					id;
+	void			*	addition;
+};
 struct uniquequeue{
 	volatile int		_map[MAX_ARRAY_SIZE];
-	int					_array[MAX_ARRAY_SIZE];
+	struct uniquenode	_array[MAX_ARRAY_SIZE];
 	volatile uint		used;
 	struct event		*wait;
 #if defined (EMC_WINDOWS)
@@ -86,7 +90,7 @@ void delete_uqueue(struct uniquequeue * uq){
 	free(uq);
 }
 
-uint push_uqueue(struct uniquequeue * uq, int v){
+uint push_uqueue(struct uniquequeue * uq, int v, void * p){
 	_lock_queue(uq);
 	if(uq->_map[v] > 0){
 		_unlock_queue(uq);
@@ -96,21 +100,25 @@ uint push_uqueue(struct uniquequeue * uq, int v){
 		_unlock_queue(uq);
 		return -1;
 	}
-	uq->_array[uq->used ++] = v;
+	uq->_array[uq->used].id = v;
+	uq->_array[uq->used ++].addition = p;
 	uq->_map[v] = 1;
 	post_event(uq->wait);
 	_unlock_queue(uq);
 	return 0;
 }
 
-int pop_uqueue(struct uniquequeue * uq){
+int pop_uqueue(struct uniquequeue * uq, void ** p){
 	int v = -1;
 	_lock_queue(uq);
 	if(!uq->used){
 		_unlock_queue(uq);
 		return -1;
 	}
-	v = uq->_array[0];
+	v = uq->_array[0].id;
+	if(p){
+		*p = uq->_array[0].addition;
+	}
 	if(uq->used > 1){
 		memmove(uq->_array, uq->_array+1, sizeof(int) * (uq->used-1));
 	}

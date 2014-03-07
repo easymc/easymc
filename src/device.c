@@ -32,71 +32,67 @@
 #include "tcp.h"
 #include "emc.h"
 #include "msg.h"
+#include "util/hashmap.h"
 #include "util/ringqueue.h"
 #include "util/utility.h"
 
 struct emc_device{
 	// Device id
 	int					id;
-	// Device mode
-	ushort				mode;
 	// operation type device can accept
 	uint				operate;
-	struct ipc			*ipc_;
-	struct tcp			*tcp_;
-	//Message queue
-	struct ringqueue	*mq;
+	// thread number
+	uint				thread;
+	// tcp manager
+	struct tcp_mgr	 *	mgr;
 	//Monitor message queue
-	struct ringqueue	*mmq;
+	struct ringqueue *	mmq;
+	// plug map
+	struct hashmap	 *	plug_map;
 };
+
+static void plug_delete_cb(struct hashmap * m, int id, void * p, void * addition){
+	emc_close(id);
+}
 
 int emc_device(void){
 	int id = -1;
 	struct emc_device * ed = (struct emc_device *)malloc(sizeof(struct emc_device));
-	if(!ed) return -1;
-	memset(ed,0,sizeof(struct emc_device));
-	ed->mq = create_ringqueue(_RQ_M);
-	if(!ed->mq){
-		free(ed);
+	if(!ed) {
+		errno = ENOMEM;
 		return -1;
 	}
+	memset(ed, 0, sizeof(struct emc_device));
 	ed->mmq = create_ringqueue(_RQ_M);
 	if(!ed->mmq){
-		delete_ringqueue(ed->mq);
 		free(ed);
+		errno = ENOMEM;
 		return -1;
 	}
+	ed->plug_map = hashmap_new(EMC_SOCKETS_DEFAULT);;
 	id = global_add_device(ed);
 	if(id < 0){
-		delete_ringqueue(ed->mq);
 		delete_ringqueue(ed->mmq);
 		free(ed);
+		errno = EUSERS;
 		return -1;
 	}
 	return id;
 }
 
 void emc_destory(int device){
-	void *msg=NULL;
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	if(ed){
-		post_ringqueue(ed->mq);
+		hashmap_foreach(ed->plug_map, plug_delete_cb, NULL);
 		post_ringqueue(ed->mmq);
-		if(ed->ipc_){
-			delete_ipc(ed->ipc_);
-		}
-		if(ed->tcp_){
-			delete_tcp(ed->tcp_);
-		}
-		while(1){
-			if(pop_ringqueue_multiple(ed->mq, (void**)&msg) < 0){
-				break;
-			}else{
-				emc_msg_free(msg);
-			}
-		}
-		delete_ringqueue(ed->mq);
+		nsleep(100);
 		delete_ringqueue(ed->mmq);
+		ed->mmq = NULL;
+		if(ed->mgr){
+			delete_tcp_mgr(ed->mgr);
+		}
+		hashmap_delete(ed->plug_map);
+		ed->plug_map = NULL;
 		free(ed);
 	}
 	global_erase_device(device);
@@ -106,6 +102,7 @@ void emc_destory(int device){
 	 int add=0;
 	 struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	 if(!ed){
+		 errno = ENODEVICE;
 		 return -1;
 	 }
 	if(sizeof(char) == optlen){
@@ -115,139 +112,27 @@ void emc_destory(int device){
 	}else if(sizeof(int) == optlen){
 		add = *(int *)optval;
 	}else if(sizeof(int64) == optlen){
-		add=*(int64 *)optval;
+		add = *(int64 *)optval;
 	}
-	if(add > 0){
-		if(opt & EMC_OPT_MONITOR){
-			ed->operate |= EMC_OPT_MONITOR;
-		}
-		if(opt & EMC_OPT_CONTROL){
-			ed->operate |= EMC_OPT_CONTROL;
-		}
+	if(opt & EMC_OPT_THREAD){
+		if(add <= 0) add = 1;
+		ed->thread = add;
 	}else{
-		if(opt & EMC_OPT_MONITOR){
-			ed->operate &= ~EMC_OPT_MONITOR;
-		}
-		if(opt & EMC_OPT_CONTROL){
-			ed->operate &= ~EMC_OPT_CONTROL;
-		}
-	}
-	return 0;
-}
-
-int emc_bind(int device, const char * ip, const ushort port){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(ed->ipc_ || ed->tcp_){
-		return -1;
-	}
-	ed->tcp_ = create_tcp(ip?inet_addr(ip):0, port, device, EMC_NONE,EMC_LOCAL);
-	if(!ed->tcp_){
-		return -1;
-	}
-	ed->ipc_ = create_ipc(ip?inet_addr(ip):0, port, device, EMC_NONE,EMC_LOCAL);
-	if(!ed->ipc_){
-		return -1;
-	}
-	return 0;
-}
-
-int emc_connect(int device, ushort mode, const char * ip, const ushort port){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(ed->ipc_ || ed->tcp_){
-		return -1;
-	}
-	if(EMC_PUB == mode)mode = EMC_SUB;
-	if(EMC_REP == mode)mode = EMC_REQ;
-	ed->mode = mode;
-	if(!ip || check_local_machine(inet_addr(ip))){
-		ed->ipc_ = create_ipc(inet_addr(ip), port, device, mode, EMC_REMOTE);
-		if(!ed->ipc_){
-			return -1;
-		}
-	}else{
-		ed->tcp_ = create_tcp(inet_addr(ip), port, device, mode, EMC_REMOTE);
-		if(!ed->tcp_){
-			delete_tcp(ed->tcp_);
-			ed->tcp_ = NULL;
-			return -1;
-		}
-	}
-	return 0;
-}
-
-int emc_control(int device, int id, int ctl){
-	int result=-1;
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(!(ed->operate & EMC_OPT_CONTROL)) return -1;
-	if(ctl & EMC_CTL_CLOSE){
-		if(ed->ipc_){
-			if(0 == close_ipc(ed->ipc_, id)){
-				result = 0;
+		if(add > 0){
+			if(opt & EMC_OPT_MONITOR){
+				ed->operate |= EMC_OPT_MONITOR;
+			}
+			if(opt & EMC_OPT_CONTROL){
+				ed->operate |= EMC_OPT_CONTROL;
+			}
+		}else{
+			if(opt & EMC_OPT_MONITOR){
+				ed->operate &= ~EMC_OPT_MONITOR;
+			}
+			if(opt & EMC_OPT_CONTROL){
+				ed->operate &= ~EMC_OPT_CONTROL;
 			}
 		}
-		if(ed->tcp_){
-			if(0 == close_tcp(ed->tcp_, id)){
-				result = 0;
-			}
-		}
-	}
-	return result;
-}
-
-int emc_close(int device){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(ed->ipc_){
-		delete_ipc(ed->ipc_);
-	}
-	if(ed->tcp_){
-		delete_tcp(ed->tcp_);
-	}
-	return 0;
-}
-
-int emc_send(int device, void * msg, int flag){
-	int result=-1;
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(ed->ipc_){
-		if(0 == send_ipc(ed->ipc_, msg, flag)){
-			result = 0;
-		}
-	}
-	if(ed->tcp_){
-		if(0 == send_tcp(ed->tcp_, msg, flag)){
-			result = 0;
-		}
-	}
-	return result;
-}
-
-int emc_recv(int device, void ** msg){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(!check_ringqueue_multiple(ed->mq)){
-		if(0!=wait_ringqueue(ed->mq)){
-			return -1;
-		}
-	}
-	if(pop_ringqueue_multiple(ed->mq, msg) < 0){
-		return -1;
 	}
 	return 0;
 }
@@ -255,7 +140,8 @@ int emc_recv(int device, void ** msg){
 int emc_monitor(int device, struct monitor_data * data){
 	struct monitor_data * md = NULL;
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
+	if(!ed || !ed->mmq){
+		errno = ENODEVICE;
 		return -1;
 	}
 	if(!check_ringqueue_multiple(ed->mmq)){
@@ -264,6 +150,7 @@ int emc_monitor(int device, struct monitor_data * data){
 		}
 	}
 	if(pop_ringqueue_multiple(ed->mmq, (void **)&md) < 0){
+		errno = EQUEUE;
 		return -1;
 	}
 	if(data && md){
@@ -275,31 +162,14 @@ int emc_monitor(int device, struct monitor_data * data){
 	return 0;
 }
 
-ushort get_device_mode(int device){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	return ed->mode;
-}
-
-int push_device_message(int device, void * msg){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(!ed){
-		return -1;
-	}
-	if(push_ringqueue(ed->mq, msg) < 0){
-		return -1;
-	}
-	return 0;
-}
-
 int push_device_event(int device, void * data){
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	if(!ed){
+		errno = ENODEVICE;
 		return -1;
 	}
 	if(push_ringqueue(ed->mmq, data) < 0){
+		errno = EQUEUE;
 		return -1;
 	}
 	return 0;
@@ -309,6 +179,7 @@ int push_device_event(int device, void * data){
 uint get_device_monitor(int device){
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	if(!ed){
+		errno = ENODEVICE;
 		return 0;
 	}
 	return (ed->operate & EMC_OPT_MONITOR);
@@ -317,7 +188,50 @@ uint get_device_monitor(int device){
 uint get_device_control(int device){
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	if(!ed){
+		errno = ENODEVICE;
 		return 0;
 	}
 	return (ed->operate & EMC_OPT_CONTROL);
+}
+
+struct tcp_mgr * get_device_tcp_mgr(int device){
+	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	if(!ed){
+		errno = ENODEVICE;
+		return NULL;
+	}
+	return ed->mgr;
+}
+
+void set_device_tcp_mgr(int device, struct tcp_mgr *mgr){
+	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	if(ed){
+		errno = ENODEVICE;
+		ed->mgr = mgr;
+	}
+}
+
+uint get_device_thread(int device){
+	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	if(!ed){
+		errno = ENODEVICE;
+		return 0;
+	}
+	return ed->thread;
+}
+
+int add_device_plug(int device, int plug, void * p){
+	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	if(!ed){
+		errno = ENODEVICE;
+		return -1;
+	}
+	return hashmap_insert(ed->plug_map, plug, p);
+}
+
+void del_device_plug(int device, int plug){
+	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	if(ed){
+		hashmap_erase(ed->plug_map, plug);
+	}
 }
