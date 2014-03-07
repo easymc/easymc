@@ -69,7 +69,10 @@ static uint msg_check_live(const void * msg){
 
 void *emc_msg_alloc(void * data, uint size){
 	struct message * msg_ = (struct message *)malloc_impl(sizeof(struct message)+size);
-	if(!msg_) return NULL;
+	if(!msg_) {
+		errno = ENOMEM;
+		return NULL;
+	}
 	memset(msg_, 0, sizeof(struct message)+size);
 	msg_->flag = EMC_LIVE;
 	msg_->serial = global_get_data_serial();

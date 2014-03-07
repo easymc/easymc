@@ -53,7 +53,10 @@ struct easymc_plug{
 int emc_plug(int device){
 	int id = -1;
 	struct easymc_plug * pg = (struct easymc_plug *)malloc(sizeof(struct easymc_plug));
-	if(!pg) return -1;
+	if(!pg) {
+		errno = ENOMEM;
+		return -1;
+	}
 	memset(pg, 0, sizeof(struct easymc_plug));
 	pg->device = device;
 	pg->mq = create_ringqueue(_RQ_M);

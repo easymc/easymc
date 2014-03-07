@@ -121,7 +121,7 @@ const char * emc_errno_str(int errn){
 	switch(errn){
 #ifdef EMC_EUSERS_DEFINED
 	case EUSERS:
-		return "Too many plug";
+		return "Too many handle";
 #endif
 
 #ifdef EMC_ENOPLUG_DEFINED
