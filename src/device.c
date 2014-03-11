@@ -90,6 +90,7 @@ void emc_destory(int device){
 		ed->mmq = NULL;
 		if(ed->mgr){
 			delete_tcp_mgr(ed->mgr);
+			ed->mgr = NULL;
 		}
 		hashmap_delete(ed->plug_map);
 		ed->plug_map = NULL;
@@ -115,6 +116,7 @@ void emc_destory(int device){
 		add = *(int64 *)optval;
 	}
 	if(opt & EMC_OPT_THREAD){
+		if(ed->mgr) return -1;
 		if(add <= 0) add = 1;
 		ed->thread = add;
 	}else{

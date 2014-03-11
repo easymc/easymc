@@ -93,6 +93,23 @@ static emc_result_t EMC_CALL  global_reconnect_cb(void * args){
 #endif
 }
 
+static uint global_number_cas(volatile uint * key, uint _old, uint _new){
+#ifdef EMC_WINDOWS
+	return InterlockedCompareExchange((long*)key, _new, _old);
+#else
+	return __sync_val_compare_and_swap(key, _old, _new);
+#endif
+}
+
+static uint global_number_next(volatile uint * v){
+	uint current=0, next=0;
+	do{
+		current = *v;
+		next = current + 1;
+	}while(current != global_number_cas(v, current, next));
+	return next;
+}
+
 static void global_init(void){
 	int64 index = 0;
 	if(!self.devices){
@@ -135,12 +152,11 @@ void global_term(void){
 }
 
 int global_add_device(void * device_){
-	int id = self.device_serial;
+	int id = global_number_next(&self.device_serial);
 	global_init();
 	if(hashmap_insert(self.devices, id, device_) < 0){
 		return -1;
 	}
-	self.device_serial ++;
 	return id;
 }
 
@@ -158,12 +174,11 @@ void global_erase_device(int id){
 }
 
 int global_add_plug(void * plug){
-	int id = self.plug_serial;
+	int id = global_number_next(&self.plug_serial);
 	global_init();
 	if(hashmap_insert(self.plugs, id, plug) < 0){
 		return -1;
 	}
-	self.plug_serial ++;
 	return id;
 }
 
@@ -197,7 +212,7 @@ void global_free_unpack(void * unit){
 }
 
 unsigned int global_get_data_serial(){
-	return ++ self.data_serial;
+	return global_number_next(&self.data_serial);
 }
 
 int global_get_connect_id(){
