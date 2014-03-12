@@ -337,6 +337,16 @@ static void tcp_post_monitor(struct tcp * tcp_, struct tcp_client * client, int 
 	}
 }
 
+// The server sends the login back packet
+static void tcp_send_loginback(struct tcp * tcp_, int id, struct tcp_client * client){
+	void *msg=emc_msg_alloc(NULL, sizeof(ushort));
+	emc_msg_setid(msg, id);
+	*(ushort *)emc_msg_buffer(msg) = client->mode;
+	if(tcp_send_data(tcp_,client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
+		emc_msg_free(msg);
+	}
+}
+
 // tcp  data consolidation callback function
 static void tcp_merger_cb(char * data, int len, int id, void * addition){
 	struct tcp * tcp_ = (struct tcp *)addition;
@@ -377,7 +387,12 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 	if(client){
 		if(((struct data_unit *)data)->len == ((struct data_unit *)data)->total){
 			if(EMC_CMD_LOGIN == ((struct data_unit *)data)->cmd){
-				client->mode = *(ushort *)(data+sizeof(struct data_unit));
+				if(EMC_LOCAL == tcp_->type){
+					client->mode = *(ushort *)(data+sizeof(struct data_unit));
+					tcp_send_loginback(tcp_, id, client);
+				}else if(EMC_REMOTE == tcp_->type){
+					tcp_number_add(&client->completed);
+				}
 			}else if(EMC_CMD_DATA == ((struct data_unit *)data)->cmd){
 				struct message * msg = (struct message *)emc_msg_alloc(data+sizeof(struct data_unit), len-sizeof(struct data_unit));
 				if(msg){
@@ -1043,7 +1058,6 @@ static int init_tcp_client(struct tcp * tcp_){
 	strncpy(tcp_->client->ip, inet_ntoa(addr.sin_addr), ADDR_LEN);
 	tcp_->client->port = ntohs(addr.sin_port);
 	tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_CONNECT, NULL);
-	tcp_number_add(&tcp_->client->completed);
 	return 0;
 }
 
@@ -1249,7 +1263,7 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 	case EMC_SUB:
 		if(EMC_REMOTE == tcp_->type){
 			emc_msg_setid(msg, tcp_->client->id);
-			if(!tcp_->client->connected){
+			if(!tcp_->client->connected || !tcp_->client->completed){
 				tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_SNDFAIL, msg);
 				errno = ENOLIVE;
 				return -1;
@@ -1261,7 +1275,7 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 		}else{
 			client = tcp_->client;
 		}
-		if(!client || !client->connected){
+		if(!client || !client->connected || !client->completed){
 			errno = ENOLIVE;
 			return -1;
 		}
