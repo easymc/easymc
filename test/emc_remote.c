@@ -33,15 +33,16 @@
 
 struct para{
 	int device;
+	int plug;
 	int exit;
 };
 
 static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	struct para *pa=(struct para *)p;
-	int device=pa->device;
+	int plug=pa->plug;
 	void *msg=NULL;
 	while(!pa->exit){
-		if(0==emc_recv(device,(void **)&msg)){
+		if(0==emc_recv(plug, (void **)&msg, EMC_NOWAIT)){
 			printf("recv length=%ld\n",emc_msg_length(msg));
 			emc_msg_free(msg);
 		}
@@ -76,15 +77,15 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 }
 
 int main(int argc, char* argv[]){
-	int ch=0;int device=-1;
+	int ch=0;int device=-1,plug=-1;
 	char ip[16]={0};
 	int monitor=1,length=0,port=0;
 	void *msg=NULL;void *msg_=NULL;
 	struct para pa={0};
 
 	device=emc_device();
-	pa.device=device;
 	pa.exit=0;
+	pa.device = device;
 	printf("Input serve ip:");
 	scanf("%s",ip);
 	printf("Input server port:");
@@ -93,7 +94,9 @@ int main(int argc, char* argv[]){
 	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
 	printf("Input mode(1-req,8-sub):");
 	scanf("%ld",&ch);
-	emc_connect(device,ch,ip,port);
+	plug = emc_plug(device);
+	pa.plug=plug;
+	emc_connect(plug,ch,ip,port);
 	emc_thread(OnRecvMsg,(void *)&pa);
 	printf("Input send data length[Bytes]:");
 	scanf("%ld",&length);
@@ -104,7 +107,7 @@ int main(int argc, char* argv[]){
 			if('S'==ch || 's'==ch){
 				msg=emc_msg_alloc(NULL,length);
 				emc_msg_set_mode(msg,EMC_REQ);
-				emc_send(device,msg,0);
+				emc_send(plug,msg,0);
 				emc_msg_free(msg);
 			}else if('Q'==ch || 'q'==ch){
 				pa.exit=1;
@@ -118,7 +121,7 @@ int main(int argc, char* argv[]){
 			if('S'==ch || 's'==ch){
 				msg=emc_msg_alloc(NULL,length);
 				emc_msg_set_mode(msg,EMC_SUB);
-				emc_send(device,msg,0);
+				emc_send(plug,msg,0);
 				emc_msg_free(msg);
 			}else if('Q'==ch || 'q'==ch){
 				pa.exit=1;
@@ -126,17 +129,10 @@ int main(int argc, char* argv[]){
 			}
 		}
 	}
-// 	while(1){
-// 		msg=emc_msg_alloc(1024*1024*10);
-// 		emc_msg_set_mode(msg,EMC_REQ);
-// 		emc_send(device,msg,0);
-// 		emc_recv(device,(void **)&msg_);
-// 		printf("recv length=%ld\n",emc_msg_length(msg_));
-// 		emc_msg_free(msg_);
-// 	}
 	getchar();
 	getchar();
 	pa.exit=1;
+//	emc_close(plug);
 	emc_destory(device);
 	return 0;
 }

@@ -31,25 +31,20 @@
 #include <memory.h>
 #include "../src/emc.h"
 
-static uint send_count=0,recv_count=0;
-
 struct para{
 	int device;
+	int plug;
 	int exit;
 };
 
 static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	struct para *pa=(struct para *)p;
-	int device=pa->device;
+	int plug=pa->plug;
 	void *msg=NULL;
 	while(!pa->exit){
-		if(0==emc_recv(device,(void **)&msg)){
-			recv_count++;
+		if(0==emc_recv(plug, (void **)&msg, EMC_NOWAIT)){
 			printf("recv length=%ld\n",emc_msg_length(msg));
-			emc_msg_set_mode(msg,EMC_REQ);
-			if(0==emc_send(device,msg,EMC_NOWAIT)){
-				send_count++;
-			}
+			emc_send(plug, msg, EMC_NOWAIT);
 			emc_msg_free(msg);
 		}
 	}
@@ -70,7 +65,7 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 				printf("client disconnected server,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_SNDSUCC:
-//				printf("server send successful,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
+				printf("server send successful,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_SNDFAIL:
 				printf("server send failed,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
@@ -83,52 +78,62 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 }
 
 int main(int argc, char* argv[]){
-	int ch=0;int device=-1;
+	int ch=0;int device=-1,plug=-1;
 	char ip[16]={0};
-	char buffer[1024*7]={0};
 	int monitor=1,length=0,port=0;
 	void *msg=NULL;void *msg_=NULL;
 	struct para pa={0};
 
 	device=emc_device();
-	pa.device=device;
 	pa.exit=0;
+	pa.device = device;
 	printf("Input serve ip:");
 	scanf("%s",ip);
 	printf("Input server port:");
 	scanf("%ld",&port);
 	emc_thread(OnMonitorDevice,(void *)&pa);
 	emc_set(device,EMC_OPT_MONITOR,&monitor,sizeof(int));
-	emc_connect(device,EMC_REQ,ip,port);
+	printf("Input mode(1-req,8-sub):");
+	scanf("%ld",&ch);
+	plug = emc_plug(device);
+	pa.plug=plug;
+	emc_connect(plug,ch,ip,port);
 	emc_thread(OnRecvMsg,(void *)&pa);
 	printf("Input send data length[Bytes]:");
 	scanf("%ld",&length);
-	while(1){
-		printf("Type S or s to send data and type Q or q to quit,type P or p to display the data length transceiver\n");
-		ch=getchar();
-		if('S'==ch || 's'==ch){
-			msg=emc_msg_alloc(buffer,length);
-			emc_msg_set_mode(msg,EMC_REQ);
-			if(emc_send(device,msg,0)==0){
-				send_count++;
+	if(EMC_REQ==ch){
+		printf("You choose REQREP mode,type S or s to send data and type Q or q to quit\n");
+		while(1){
+			ch=getchar();
+			if('S'==ch || 's'==ch){
+				msg=emc_msg_alloc(NULL,length);
+				emc_msg_set_mode(msg,EMC_REQ);
+				emc_send(plug,msg,0);
+				emc_msg_free(msg);
+			}else if('Q'==ch || 'q'==ch){
+				pa.exit=1;
+				break;
 			}
-			emc_msg_free(msg);
-		}else if('Q'==ch || 'q'==ch){
-			pa.exit=1;
-			break;
-		}else if('P'==ch || 'p'==ch){
-			printf("send=%ld,recv=%ld\n",send_count,recv_count);
+		}
+	}else if(EMC_SUB==ch){
+		printf("You choose PUBSUB mode,type S or s to send data and type Q or q to quit\n");
+		while(1){
+			ch=getchar();
+			if('S'==ch || 's'==ch){
+				msg=emc_msg_alloc(NULL,length);
+				emc_msg_set_mode(msg,EMC_SUB);
+				emc_send(plug,msg,0);
+				emc_msg_free(msg);
+			}else if('Q'==ch || 'q'==ch){
+				pa.exit=1;
+				break;
+			}
 		}
 	}
-// 	msg=emc_msg_alloc(buffer,1024*7);
-// 	emc_msg_set_mode(msg,EMC_REQ);
-// 	while(1){
-// 		emc_send(device,msg,EMC_NOWAIT);
-// 		Sleep(1);
-// 	}
 	getchar();
 	getchar();
 	pa.exit=1;
+//	emc_close(plug);
 	emc_destory(device);
 	return 0;
 }

@@ -555,6 +555,7 @@ static int read_ipc(struct ipc * ipc_){
 	if(!ipc_) return -1;
 	
 	if(0==ipc_read_wait(ipc_)){
+		if(!ipc_->buffer) return -1;
 		if(EMC_LOCAL == ipc_->type){
 			while(0 == pop_ringbuffer((struct ringbuffer *)(ipc_->buffer+2*sizeof(uint)+get_ringarray_size()), buffer)){
 				process_ipc_data(ipc_, buffer);
@@ -571,6 +572,7 @@ static int read_ipc(struct ipc * ipc_){
 static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id, ushort cmd, char * data, int length){
 	char buffer[MAX_DATA_SIZE] = {0};
 
+	if(!client->buffer) return -1;
 	if(MAX_DATA_SIZE >= (length+sizeof(struct data_unit))){
 		// As long as you can send a packet to complete
 		((struct data_unit *)buffer)->cmd = cmd;

@@ -33,22 +33,25 @@
 
 struct para{
 	int device;
+	int plug;
+	int plug2;
 	int exit;
 };
 
 static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	void *msg=NULL;
 	struct para *pa=(struct para *)p;
-	int device=pa->device;
+	int plug=pa->plug;
 	while(!pa->exit){
-		if(0==emc_recv(device,(void **)&msg)){
+		if(0==emc_recv(plug,(void **)&msg, 0)){
 //			printf("recv length=%ld\n",emc_msg_length(msg));
 			if(EMC_SUB==emc_msg_get_mode(msg)){
 				emc_msg_set_mode(msg,EMC_PUB);
 			}else if(EMC_REQ==emc_msg_get_mode(msg)){
 				emc_msg_set_mode(msg,EMC_REP);
 			}
-			emc_send(device,msg,0);
+			emc_send(plug,msg,0);
+//			emc_send(pa->plug2, msg, 0);
 			emc_msg_free(msg);
 		}
 	}
@@ -64,10 +67,10 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 		if(0==emc_monitor(device,&data)){
 			switch(data.events){
 			case EMC_EVENT_ACCEPT:
-				printf("client connected server,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
+				printf("client connected server,plug=%d,ip=%s,port=%ld,id=%ld\n",data.plug,data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_CLOSED:
-				printf("client disconnected server,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
+				printf("client disconnected server plug=%d,ip=%s,port=%ld,id=%ld\n",data.plug,data.ip,data.port,data.id);
 				break;
 			case EMC_EVENT_SNDSUCC:
 //				printf("server send successful,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
@@ -86,23 +89,29 @@ int main(int argc, char* argv[]){
 	struct para pa={0};
 	int monitor=1,ch=0;
 	int device=emc_device();
-	pa.device=device;
+	int plug = -1, plug2 = -1;
 	pa.exit=0;
+	pa.device = device;
 	emc_set(device,EMC_OPT_MONITOR|EMC_OPT_CONTROL,&monitor,sizeof(int));
 	printf("Input a port to bind:");
 	scanf("%ld",&ch);
-	if(emc_bind(device,NULL,ch) < 0){
-		printf("emc_bing fail\n");
+	plug = emc_plug(device);
+//	plug2 = emc_plug(device);
+	pa.plug = plug;
+//	pa.plug2 = plug2;
+	if(emc_bind(plug,NULL,ch) < 0){
+		printf("emc_bing fail,errno=%d,msg=%s\n",emc_errno(),emc_errno_str(emc_errno()));
 	}
 	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnMonitorDevice,(void *)&pa);
+//	emc_connect(plug2, EMC_REQ, "127.0.0.1", 9002);
 	printf("Input C or c to close a connection,Q or q to exit\n");
 	while(1){
 		ch=getchar();
 		if('C'==ch || 'c'==ch){
 			printf("Input connection id:");
 			scanf("%ld",&ch);
-			emc_control(device,ch,EMC_CTL_CLOSE);
+			emc_control(plug,ch,EMC_CTL_CLOSE);
 		}else if('Q'==ch || 'q'==ch){
 			break;
 		}
@@ -110,6 +119,8 @@ int main(int argc, char* argv[]){
 	getchar();
 	getchar();
 	pa.exit=1;
+	emc_close(plug);
+//	emc_close(plug2);
 	emc_destory(device);
 	getchar();
 	return 0;

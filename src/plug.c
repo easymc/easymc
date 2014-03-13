@@ -210,14 +210,18 @@ int emc_send(int plug, void * msg, int flag){
 	return result;
 }
 
-int emc_recv(int plug, void ** msg){
+int emc_recv(int plug, void ** msg, int flag){
 	struct easymc_plug * pg = (struct easymc_plug *)global_get_plug(plug);
 	if(!pg){
 		errno = ENOPLUG;
 		return -1;
 	}
 	if(!check_ringqueue_multiple(pg->mq)){
-		if(0!=wait_ringqueue(pg->mq)){
+		if(EMC_NOWAIT != flag){
+			if(0!=wait_ringqueue(pg->mq)){
+				return -1;
+			}
+		}else {
 			return -1;
 		}
 	}

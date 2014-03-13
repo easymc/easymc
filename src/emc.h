@@ -236,7 +236,7 @@ EMC_EXP int EMC_BIND emc_connect(int plug, ushort mode, const char * ip, const u
 EMC_EXP int EMC_BIND emc_control(int plug, int id, int ctl);
 EMC_EXP int EMC_BIND emc_close(int plug);
 // After processing is complete message needs to call emc_msg_free() to release.
-EMC_EXP int EMC_BIND emc_recv(int plug, void ** msg);
+EMC_EXP int EMC_BIND emc_recv(int plug, void ** msg, int flag);
 EMC_EXP int EMC_BIND emc_send(int plug, void * msg, int flag);
 
 // Monitoring the device event
