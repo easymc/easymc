@@ -40,8 +40,8 @@ struct uniquenode{
 	void			*	addition;
 };
 struct uniquequeue{
-	volatile int		_map[MAX_ARRAY_SIZE];
-	struct uniquenode	_array[MAX_ARRAY_SIZE];
+	volatile int		ids[MAX_ARRAY_SIZE];
+	struct uniquenode	queue[MAX_ARRAY_SIZE];
 	volatile uint		used;
 	struct event		*wait;
 	volatile uint		lock;                    
@@ -63,7 +63,7 @@ void delete_uqueue(struct uniquequeue * uq){
 
 uint push_uqueue(struct uniquequeue * uq, int v, void * p){
 	emc_lock(&uq->lock);
-	if(uq->_map[v] > 0){
+	if(uq->ids[v] > 0){
 		emc_unlock(&uq->lock);
 		return 0;
 	}
@@ -71,9 +71,9 @@ uint push_uqueue(struct uniquequeue * uq, int v, void * p){
 		emc_unlock(&uq->lock);
 		return -1;
 	}
-	uq->_array[uq->used].id = v;
-	uq->_array[uq->used ++].addition = p;
-	uq->_map[v] = 1;
+	uq->queue[uq->used].id = v;
+	uq->queue[uq->used ++].addition = p;
+	uq->ids[v] = 1;
 	post_event(uq->wait);
 	emc_unlock(&uq->lock);
 	return 0;
@@ -86,14 +86,14 @@ int pop_uqueue(struct uniquequeue * uq, void ** p){
 		emc_unlock(&uq->lock);
 		return -1;
 	}
-	v = uq->_array[0].id;
+	v = uq->queue[0].id;
 	if(p){
-		*p = uq->_array[0].addition;
+		*p = uq->queue[0].addition;
 	}
 	if(uq->used > 1){
-		memmove(uq->_array, uq->_array+1, sizeof(int) * (uq->used-1));
+		memmove(uq->queue, uq->queue+1, sizeof(int) * (uq->used-1));
 	}
-	uq->_map[v] = 0;
+	uq->ids[v] = 0;
 	uq->used --;
 	emc_unlock(&uq->lock);
 	return v;

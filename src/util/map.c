@@ -38,7 +38,7 @@ struct map_node{
 };
 
 struct map{
-	struct map_node		*node;
+	struct map_node	*	node;
 	volatile uint		size;
 	volatile uint		used;
 	volatile uint		lock;

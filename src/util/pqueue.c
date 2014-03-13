@@ -41,7 +41,7 @@
 struct pqueue
 {
 	 
-	 void						**units;
+	 void	**					units;
 	 unsigned int				used;
 	 unsigned int				size;
 	 volatile unsigned int		lock;                    
