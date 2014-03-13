@@ -28,51 +28,36 @@
 
 #include "hashmap.h"
 #include "queue.h"
+#include "lock.h"
 #include "../config.h"
 
+#pragma pack(1)
 struct node {
-	int					id;
-	void				*addr;
-	struct node*		next;
-	struct emc_queue	queue;
+	int						id;
+	void *					addr;
+	struct node *			next;
+	struct emc_queue		queue;
 };
 
 struct hashmap {
-	int size;
-	struct node 		**hash;
-	struct node 		*data;
-	struct emc_queue	queue;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION	lock;                    
-#else
-	pthread_mutex_t		lock;
-#endif
+	int						size;
+	struct node **			hash;
+	struct node *			data;
+	struct emc_queue		queue;
+	volatile unsigned int	lock; 
+	volatile unsigned int	foreach;
 };
-
-static __inline void lock_hashmap(struct hashmap * m){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&m->lock);
-#else
-	pthread_mutex_lock(&m->lock);
-#endif
-}
-
-static __inline void unlock_hashmap(struct hashmap * m){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&m->lock);
-#else
-	pthread_mutex_unlock(&m->lock);
-#endif
-}
+#pragma pack()
 
 struct hashmap* hashmap_new(int max){
-	int sz=1;int i=0;struct hashmap * m = NULL;
+	int sz=1,i=0;
+	struct hashmap * m = NULL;
 	while(sz <= max) {
 		sz *= 2;
 	}
-	m=(struct hashmap*)malloc(sizeof(struct hashmap));
+	m = (struct hashmap *)malloc(sizeof(struct hashmap));
 	if(!m) return NULL;
-	memset(m, 0, sizeof(sizeof(struct hashmap)));
+	memset(m, 0, sizeof(struct hashmap));
 	m->size = sz;
 	m->hash=(struct node **)malloc(sizeof(struct node*) * sz);
 	if(!m->hash){
@@ -96,41 +81,38 @@ struct hashmap* hashmap_new(int max){
 		emc_queue_init(&m->data[i].queue);
 		emc_queue_insert_tail(&m->queue, &m->data[i].queue);
 	}
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&m->lock);
-#else
-	pthread_mutex_init(&m->lock,NULL);		
-#endif
 	return m;
 }
 
 void hashmap_delete(struct hashmap * m) {
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&m->lock);
-#else
-	pthread_mutex_destroy(&m->lock);		
-#endif
 	free(m->hash);
 	free(m->data);
 	free(m);
 }
 
-void *hashmap_search(struct hashmap * m, int id) {
-	int hash = -1;
+void * hashmap_search(struct hashmap * m, int id) {
+	int hash = -1, locked = 0;
 	void *addr = NULL;
 	struct node * n = NULL;
-	lock_hashmap(m);
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	hash = id & (m->size-1);
 	n = m->hash[hash];
 	while(n){
 		if (n->id == id){
 			addr = n->addr;
-			unlock_hashmap(m);
+			if(locked){
+				emc_unlock(&m->lock);
+			}
 			return addr;
 		}
 		n = n->next;
 	}
-	unlock_hashmap(m);
+	if(locked){
+		emc_unlock(&m->lock);
+	}
 	return NULL;
 }
 
@@ -139,12 +121,12 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 	struct node * n = NULL;
 	struct node * o = NULL;
 	struct emc_queue * head = NULL;
-	lock_hashmap(m);
-	hash=id&(m->size-1);
+	emc_lock(&m->lock);
+	hash = id & (m->size-1);
 	n = m->hash[hash];
 	head = emc_queue_head(&m->queue);
 	if(!head){
-		unlock_hashmap(m);
+		emc_unlock(&m->lock);
 		return -1;
 	}
 	emc_queue_remove(head);
@@ -156,7 +138,7 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 		while(n){
 			if(!n->next){
 				n->next = o;
-				unlock_hashmap(m);
+				emc_unlock(&m->lock);
 				return 0;
 			}
 			else{
@@ -166,18 +148,21 @@ int hashmap_insert(struct hashmap * m, int id, void * addr) {
 	}
 	else{
 		m->hash[hash] = o;
-		unlock_hashmap(m);
+		emc_unlock(&m->lock);
 		return 0;
 	}
-	unlock_hashmap(m);
+	emc_unlock(&m->lock);
 	return -1;
 }
 
-void hashmap_erase(struct hashmap * m, int id)
+int hashmap_erase(struct hashmap * m, int id)
 {
-	int hash = -1;
+	int hash = -1, locked = 0;
 	struct node * n = NULL, * prev = NULL;
-	lock_hashmap(m);
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	hash = id&(m->size-1);
 	n = m->hash[hash];
 	while(n){
@@ -192,25 +177,36 @@ void hashmap_erase(struct hashmap * m, int id)
 			n->next = NULL;
 			emc_queue_init(&n->queue);
 			emc_queue_insert_tail(&m->queue, &n->queue);
-			break;
+			if(locked){
+				emc_unlock(&m->lock);
+			}
+			return 0;
 		}
 		prev = n;
 		n = n->next;
 	}
-	unlock_hashmap(m);
+	if(locked){
+		emc_unlock(&m->lock);
+	}
+	return -1;
 }
 
 void hashmap_foreach(struct hashmap * m, hashmap_foreach_cb * cb, void * addition){
 	int i = 0;
-	lock_hashmap(m);
+	emc_lock(&m->lock);
+	emc_lock(&m->foreach);
 	for (i=0; i<m->size; i++){
 		struct node * n = m->hash[i];
 		while(n){
 			if(cb){
-				cb(m, n->id, n->addr, addition);
+				if(cb(m, n->id, n->addr, addition)){
+					n = m->hash[i];
+					continue;
+				}
 			}
 			n = n->next;
 		}
 	}
-	unlock_hashmap(m);
+	emc_unlock(&m->foreach);
+	emc_unlock(&m->lock);
 }

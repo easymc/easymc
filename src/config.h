@@ -84,13 +84,15 @@
 #endif
 
 #ifdef EMC_WINDOWS
-#define rmb()	MemoryBarrier()
-#define wmb()	MemoryBarrier()
+#define emc_mb	MemoryBarrier
 #else
-#ifndef CONFIG_SMP
-#define rmb()	__asm__ __volatile__("": : :"memory") 
-#define wmb()	__asm__ __volatile__("": : :"memory") 
+#define emc_mb	__sync_synchronize
 #endif
+
+#if defined (EMC_WINDOWS)
+#define emc_inline	__inline
+#else
+#define emc_inline	inline
 #endif
 
 // The maximum number of supported socket
@@ -157,7 +159,6 @@
 // Wait function
 #if defined (EMC_WINDOWS)
 #define nsleep(x)	Sleep(x)
-#define	inline	__inline
 #else
 #define nsleep(x)	usleep(x*1000)
 #define sprintf_s	snprintf

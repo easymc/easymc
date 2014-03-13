@@ -43,7 +43,7 @@ extern "C"{
 	int push_device_event(int id, void * data);
 
 	int add_device_plug(int id, int plug, void * p);
-	void del_device_plug(int id, int plug);
+	int del_device_plug(int id, int plug);
 #ifdef __cplusplus
 }
 #endif

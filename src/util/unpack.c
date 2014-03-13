@@ -30,6 +30,7 @@
 #include "../emc.h"
 #include "unpack.h"
 #include "queue.h"
+#include "lock.h"
 #include "memory/jemalloc.h"
 
 #define UNPACK_BUFFER_SIZE		(16392)
@@ -43,33 +44,13 @@ struct unpack_unit{
 };
 
 struct unpack{
-	struct unpack_unit	*	units;
-	struct emc_queue		idle;
+	struct unpack_unit *units;
+	struct emc_queue	idle;
 	// The number of units assigned to elements
-	volatile unsigned int	count;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION	lock;
-#else
-	pthread_mutex_t		lock;
-#endif
+	volatile uint		count;
+	volatile uint		lock;
 };
 #pragma pack()
-
-static void _unpack_lock(struct unpack * un){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&un->lock);
-#else
-	pthread_mutex_lock(&un->lock);
-#endif
-}
-
-static void _unpack_unlock(struct unpack * un){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&un->lock);
-#else
-	pthread_mutex_unlock(&un->lock);
-#endif
-}
 
 struct unpack *unpack_new(unsigned int count){
 	struct unpack * un = (struct unpack *)malloc(sizeof(struct unpack));
@@ -86,20 +67,10 @@ struct unpack *unpack_new(unsigned int count){
 		emc_queue_init(&un->units[index].queue);
 		emc_queue_insert_tail(&un->idle, &un->units[index].queue);
 	}
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&un->lock);
-#else
-	pthread_mutex_init(&un->lock,NULL);
-#endif
 	return un;
 }
 
 void unpack_delete(struct unpack * un){
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&un->lock);
-#else
-	pthread_mutex_destroy(&un->lock);
-#endif
 	free(un->units);
 	free(un);
 }
@@ -107,14 +78,14 @@ void unpack_delete(struct unpack * un){
 void* unpack_alloc(struct unpack * un){
 	struct emc_queue * head = NULL;
 	
-	_unpack_lock(un);
+	emc_lock(&un->lock);
 	head = emc_queue_head(&un->idle);
 	if(!head){
-		_unpack_unlock(un);
+		emc_unlock(&un->lock);
 		return NULL;
 	}
 	emc_queue_remove(head);
-	_unpack_unlock(un);
+	emc_unlock(&un->lock);
 	return emc_queue_data(head, struct unpack_unit, queue);
 }
 
@@ -180,12 +151,12 @@ void unpack_get(void * block, unpack_get_data * cb, int id, void * args, char * 
 
 void unpack_free(struct unpack * un, void * block){
 	struct unpack_unit * unit = (struct unpack_unit *)block;
-	_unpack_lock(un);
+	emc_lock(&un->lock);
 	if(unit->buffer){
 		free_impl(unit->buffer);
 		unit->buffer = NULL;
 	}
 	emc_queue_init(&unit->queue);
 	emc_queue_insert_tail(&un->idle, &unit->queue);
-	_unpack_unlock(un);
+	emc_unlock(&un->lock);
 }

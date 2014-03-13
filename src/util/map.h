@@ -47,7 +47,6 @@ extern "C" {
 	int map_get(struct map * m, int64 key, void ** val);
 	int map_set(struct map * m, int64 key, void * val);
 	int map_erase(struct map * m, int64 key);
-	int	map_erase_nonlock(struct map * m, int64 key);
 	void map_foreach(struct map * m, map_foreach_cb * cb, void * addition);
 	unsigned int map_size(struct map * m);
 	void map_clear(struct map * m);

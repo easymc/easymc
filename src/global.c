@@ -74,7 +74,7 @@ static uint reconnect_map_foreach_cb(struct map * m, int64 key, void * p, void *
 	struct reconnect * rc = (struct reconnect *)p;
 	if(rc->cb){
 		if(0 == ((on_reconnect_cb *)rc->cb)(rc->client, rc->addition)){
-			map_erase_nonlock(m, key);
+			map_erase(m, key);
 			return 1;
 		}
 	}
@@ -118,7 +118,7 @@ static void global_init(void){
 		WSAStartup(MAKEWORD(2, 2), &wsaData);
 #endif
 		self.devices = hashmap_new(GLOBAL_DEVICE_DEFAULT);
-		self.plugs = hashmap_new(GLOBAL_DEVICE_DEFAULT);
+		self.plugs = hashmap_new(EMC_SOCKETS_DEFAULT);
 		self.mg = merger_new(EMC_SOCKETS_DEFAULT);
 		self.upk = unpack_new(EMC_SOCKETS_DEFAULT);
 		self.id_allocator = create_pqueue();
@@ -152,8 +152,9 @@ void global_term(void){
 }
 
 int global_add_device(void * device_){
-	int id = global_number_next(&self.device_serial);
+	int id = -1;
 	global_init();
+	id = global_number_next(&self.device_serial);
 	if(hashmap_insert(self.devices, id, device_) < 0){
 		return -1;
 	}
@@ -174,8 +175,9 @@ void global_erase_device(int id){
 }
 
 int global_add_plug(void * plug){
-	int id = global_number_next(&self.plug_serial);
+	int id = -1;
 	global_init();
+	id = global_number_next(&self.plug_serial);
 	if(hashmap_insert(self.plugs, id, plug) < 0){
 		return -1;
 	}

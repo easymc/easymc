@@ -51,8 +51,9 @@ struct emc_device{
 	struct hashmap	 *	plug_map;
 };
 
-static void plug_delete_cb(struct hashmap * m, int id, void * p, void * addition){
+static uint plug_delete_cb(struct hashmap * m, int id, void * p, void * addition){
 	emc_close(id);
+	return 1;
 }
 
 int emc_device(void){
@@ -231,9 +232,8 @@ int add_device_plug(int device, int plug, void * p){
 	return hashmap_insert(ed->plug_map, plug, p);
 }
 
-void del_device_plug(int device, int plug){
+int del_device_plug(int device, int plug){
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
-	if(ed){
-		hashmap_erase(ed->plug_map, plug);
-	}
+	if(!ed) return -1;
+	return hashmap_erase(ed->plug_map, plug);
 }

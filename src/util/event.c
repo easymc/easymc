@@ -37,10 +37,7 @@ struct event{
 	HANDLE	evt;
 #else
 	sem_t	evt;
-	pthread_mutex_t lock;
-	pthread_cond_t	cond;
 #endif
-	int timeout;
 };
 
 #pragma pack()
@@ -51,8 +48,6 @@ struct event* create_event(){
 	evt->evt = CreateEvent(NULL, FALSE, FALSE, NULL);
 #else
 	sem_init(&evt->evt, 0, 0);
-	pthread_mutex_init(&evt->lock, NULL);
-	pthread_cond_init(&evt->cond, NULL);
 #endif
 	return evt;
 }
@@ -62,8 +57,6 @@ void delete_event(struct event * evt){
 	CloseHandle(evt->evt);
 #else
 	sem_destroy(&evt->evt);
-	pthread_mutex_destroy(&evt->lock);
-	pthread_cond_destroy(&evt->cond);
 #endif
 	free(evt);
 }
@@ -80,29 +73,26 @@ int wait_event(struct event * evt, int timeout){
 		ResetEvent(evt->evt);
 		return 1;
 	}
-	return -1;
 #else
-	evt->timeout = timeout;
 	if(timeout < 0){
 		return sem_wait(&evt->evt);
-	}
-	pthread_mutex_lock(&evt->lock);
-	if(timeout > 0){
-		struct timespec tp = {time(NULL)+timeout/1000, (timeout%1000)*1000*1000};
-		status = pthread_cond_timedwait(&evt->cond, &evt->lock, &tp);
-	}
-	else{
-		status = pthread_cond_wait(&evt->cond, &evt->lock);
-	}
-	pthread_mutex_unlock(&evt->lock);
-	if(0 == status){
+	}else{
+		struct timespec tp = {0};
+		if(clock_gettime(CLOCK_REALTIME, &tp) < 0){
+			return -1;
+		}
+		tp.tv_sec += timeout/1000;
+		tp.tv_nsec += (timeout%1000)*1000*1000;
+		if(sem_timedwait(&evt->evt, &tp) < 0){
+			if(ETIMEDOUT == errno){
+				return 1;
+			}
+			return -1;
+		}
 		return 0;
 	}
-	else if(ETIMEDOUT == status){
-		return 1;
-	}
-	return -1;
 #endif
+	return -1;
 }
 
 int post_event(struct event * evt){
@@ -111,13 +101,6 @@ int post_event(struct event * evt){
 		return -1;
 	return 0;
 #else
-	if(evt->timeout < 0){
-		sem_post(&evt->evt);
-	}else{
-		pthread_mutex_lock(&evt->lock);
-		pthread_cond_broadcast(&evt->cond);
-		pthread_mutex_unlock(&evt->lock);
-	}
-	return 0;
+	return sem_post(&evt->evt);
 #endif
 }

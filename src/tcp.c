@@ -153,7 +153,7 @@ struct tcp{
 	//port
 	ushort				port;
 	//close lock
-	struct emc_lock		*term_lck;
+	volatile uint		term_lck;
 #if !defined (EMC_WINDOWS)	
 	struct sockhash		*hash;
 #endif
@@ -175,6 +175,8 @@ struct tcp_mgr{
 #pragma pack()
 
 static int init_tcp_client(struct tcp * tcp_);
+static void tcp_send_login(struct tcp * tcp_);
+static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort cmd, int flag, void * msg);
 
 //Cas Operate
 static uint tcp_number_cas(volatile uint * key, uint _old, uint _new){
@@ -255,10 +257,11 @@ static int tcp_add_event(struct tcp_area * area, struct tcp_client * client, uin
 	}
 #else
 	struct epoll_event e;
-	e.events = 0;
+	if(mask & EMC_READ){
+		e.events = EPOLLIN;
+	}
 	e.data.u64 = 0; /* avoid valgrind warning */
-	e.data.fd = client->fd;
-	e.data.ptr = client->tcp_;
+	e.data.ptr = client;
 	if(epoll_ctl(area->fd, EPOLL_CTL_ADD, client->fd, &e) < 0){
 		return -1;
 	}
@@ -267,8 +270,8 @@ static int tcp_add_event(struct tcp_area * area, struct tcp_client * client, uin
 }
 
 // Set socket literacy event
-static int tcp_set_event(struct tcp_area * area, struct tcp_client * client, uint mask){
 #if defined (EMC_WINDOWS)
+static int tcp_set_event(struct tcp_area * area, struct tcp_client * client, uint mask){
 	unsigned long flag=0, length=0;
 	if(mask & EMC_READ){
 		memset(&client->olr.ol, 0, sizeof(OVERLAPPED));
@@ -280,20 +283,9 @@ static int tcp_set_event(struct tcp_area * area, struct tcp_client * client, uin
 			}
 		}
 	}
-#else
-	struct epoll_event e;
-	if(mask & EMC_READ){
-		e.events = EPOLLIN;
-	}
-	e.data.u64 = 0; /* avoid valgrind warning */
-	e.data.fd = client->fd;
-	e.data.ptr = client->tcp_;
-	if(epoll_ctl(area->fd, EPOLL_CTL_MOD, client->fd, &e) < 0){
-		return -1;
-	}
-#endif
 	return 0;
 }
+#endif
 
 #if !defined (EMC_WINDOWS)
 static void tcp_del_event(struct tcp * tcp_, struct tcp_area * area, int fd){
@@ -461,7 +453,11 @@ static int tcp_recv_data(int fd, char * buf, int len){
 
 //	Callback client reconnection
 static int tcp_reconnect_cb(void * p, void * addition){
-	return init_tcp_client((struct tcp *)addition);
+	if(0 == init_tcp_client((struct tcp *)addition)){
+		tcp_send_login((struct tcp *)addition);
+		return 0;
+	}
+	return -1;
 }
 
 static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
@@ -470,10 +466,10 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 
 	if(EMC_LIVE != tcp_->flag) return -1;
 
-	lock_enter(tcp_->term_lck);
+	emc_lock(&tcp_->term_lck);
 	if(EMC_LOCAL == tcp_->type){
 		if(!(client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id))){
-			lock_leave(tcp_->term_lck);
+			emc_unlock(&tcp_->term_lck);
 			return -1;
 		}
 	}else if(EMC_REMOTE == tcp_->type){
@@ -489,7 +485,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 		global_free_unpack(client->rupk);
 		client->rupk = NULL;
 	}
-	while(0==global_pop_sendqueue(client->id, (void **)&msg)){
+	while(0==global_pop_sendqueue(id, (void **)&msg)){
 		if(emc_msg_zero_ref(msg) > 0){
 			tcp_post_monitor(tcp_, client, EMC_EVENT_SNDFAIL, msg);
 			emc_msg_free(msg);
@@ -498,7 +494,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	area->count --;
 	if(EMC_LOCAL == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
-		global_idle_connect_id(client->id);
+		global_idle_connect_id(id);
 		free_impl(client);
 		hashmap_erase(tcp_->server->connection, id);
 	}else if(EMC_REMOTE == tcp_->type){
@@ -507,7 +503,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 			global_add_reconnect(id, tcp_reconnect_cb, client, tcp_);
 		}
 	}
-	lock_leave(tcp_->term_lck);
+	emc_unlock(&tcp_->term_lck);
 	return 0;
 }
 
@@ -578,13 +574,14 @@ static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort c
 }
 
 // Push data to all subscribers end
-static void tcp_pub_foreach_cb(struct hashmap * m, int key, void * p, void * addition){
+static uint tcp_pub_foreach_cb(struct hashmap * m, int key, void * p, void * addition){
 	struct tcp_unit * unit = (struct tcp_unit *)addition;
 	if(EMC_SUB == ((struct tcp_client *)p)->mode && ((struct tcp_client *)p)->connected){
 		if(tcp_send_data(unit->tcp_,(struct tcp_client *)p, EMC_CMD_DATA, unit->wait, unit->msg) < 0){
 			tcp_post_monitor(unit->tcp_, (struct tcp_client *)p, EMC_EVENT_SNDFAIL, unit->msg);
 		}
 	}
+	return 0;
 }
 
 // Subcontracting send data
@@ -740,16 +737,6 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		_close_socket(fd);
 		return -1;
 	}
-#if !defined (EMC_WINDOWS)
-	if(tcp_set_event(area, client, EMC_READ) < 0){
-		tcp_del_event(tcp_, area, fd);
-		sockhash_erase(tcp_->hash, client->fd);
-		global_idle_connect_id(client->id);
-		free_impl(client);
-		_close_socket(fd);
-		return -1;
-	}
-#endif
 	if(hashmap_insert(tcp_->server->connection, client->id, client) < 0){
 #if !defined (EMC_WINDOWS)
 		sockhash_erase(tcp_->hash, client->fd);
@@ -773,14 +760,14 @@ static emc_result_t EMC_CALL tcp_work_cb(void * args){
 	struct tcp_overlapped *ol = NULL;
 #else
 	int retval=-1, id=-1;
-	struct epoll_event	events[TCP_FD_SIZE] = {0};
+	struct epoll_event	events[TCP_FD_SIZE];
 #endif
 	struct tcp_area	*area = (struct tcp_area *)args;
 	struct tcp_mgr * mgr = area->mgr;
 
 	while(!mgr->exit){
 #if defined (EMC_WINDOWS)
-		if(GetQueuedCompletionStatus(area->fd, (LPDWORD)&length, (PULONG_PTR)&key, (LPOVERLAPPED *)&ol, INFINITE)){
+		if(GetQueuedCompletionStatus(area->fd, (LPDWORD)&length, (PULONG_PTR)&key, (LPOVERLAPPED *)&ol, 1)){
 			if(key < EMC_SOCKETS_DEFAULT){
 				if(ol){
 					if(STATUS_REMOTE_DISCONNECT == ol->ol.Internal ||
@@ -807,14 +794,14 @@ static emc_result_t EMC_CALL tcp_work_cb(void * args){
 			}
 		}
 #else
-		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, -1);
+		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, 1);
 		if(retval > 0){
 			int j = 0;
 			for (j=0; j<retval; j++){
-				id = sockhash_search(((struct tcp *)events[j].data.ptr)->hash, events[j].data.fd);
+				id = ((struct tcp_client *)events[j].data.ptr)->id;
 				if(id >=0 && id < EMC_SOCKETS_DEFAULT){
 					if(events[j].events & EPOLLIN){
-						process_recv((struct tcp *)events[j].data.ptr, area, id);
+						process_recv(((struct tcp_client *)events[j].data.ptr)->tcp_, area, id);
 					}
 				}
 			}
@@ -869,8 +856,9 @@ static emc_result_t EMC_CALL tcp_accept_cb(void * args){
 #endif
 }
 
-static void tcp_close_cb(struct hashmap * m, int id, void * p, void * addition){
+static uint tcp_close_cb(struct hashmap * m, int id, void * p, void * addition){
 	_close_socket(((struct tcp_client *)p)->fd);
+	return 0;
 }
 
 // Tcp server initialization
@@ -1048,13 +1036,6 @@ static int init_tcp_client(struct tcp * tcp_){
 		tcp_->client->connected = 0;
 		return -1;
 	}
-#if !defined (EMC_WINDOWS)
-	if(tcp_set_event(tcp_->client->area, tcp_->client, EMC_READ) < 0){
-		_close_socket(tcp_->client->fd);
-		tcp_->client->connected=0;
-		return -1;
-	}
-#endif
 	strncpy(tcp_->client->ip, inet_ntoa(addr.sin_addr), ADDR_LEN);
 	tcp_->client->port = ntohs(addr.sin_port);
 	tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_CONNECT, NULL);
@@ -1095,6 +1076,7 @@ struct tcp_mgr * create_tcp_mgr(int device, int thread){
 		return NULL;
 	}
 	memset(mgr, 0 , sizeof(struct tcp_mgr));
+	mgr->device = device;
 	if(init_tcp_mgr(mgr, thread) < 0){
 		free(mgr);
 		return NULL;
@@ -1118,12 +1100,10 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 #if !defined (EMC_WINDOWS)
 	tcp_->hash = sockhash_new(EMC_SOCKETS_DEFAULT);
 #endif
-	tcp_->term_lck = lock_new();
 	tcp_->rmap = create_map(EMC_SOCKETS_DEFAULT);
 	if(EMC_LOCAL == type){
 		tcp_->server = (struct tcp_server *)malloc(sizeof(struct tcp_server));
 		if(!tcp_->server){
-			lock_delete(tcp_->term_lck);
 			delete_map(tcp_->rmap);
 #if !defined (EMC_WINDOWS)
 			sockhash_delete(tcp_->hash);
@@ -1135,7 +1115,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 		}
 		memset(tcp_->server, 0, sizeof(struct tcp_server));
 		if(init_tcp_server(tcp_) < 0){
-			lock_delete(tcp_->term_lck);
 			delete_map(tcp_->rmap);
 #if !defined (EMC_WINDOWS)
 			sockhash_delete(tcp_->hash);
@@ -1147,7 +1126,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 	}else if(EMC_REMOTE == type){
 		tcp_->client = (struct tcp_client *)malloc(sizeof(struct tcp_client));
 		if(!tcp_->client){
-			lock_delete(tcp_->term_lck);
 			delete_map(tcp_->rmap);
 #if !defined (EMC_WINDOWS)
 			sockhash_delete(tcp_->hash);
@@ -1165,7 +1143,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 				_close_socket(tcp_->client->fd);
 				global_idle_connect_id(tcp_->client->id);
 				free(tcp_->client);
-				lock_delete(tcp_->term_lck);
 				delete_map(tcp_->rmap);
 #if !defined (EMC_WINDOWS)
 				sockhash_delete(tcp_->hash);
@@ -1213,6 +1190,7 @@ void delete_tcp(struct tcp * tcp_){
 		}else if(EMC_REMOTE == tcp_->type){
 			global_free_reconnect(tcp_->client->id);
 			_close_socket(tcp_->client->fd);
+			nsleep(100);
 			free(tcp_->client);
 			tcp_->client = NULL;
 		}
@@ -1222,8 +1200,6 @@ void delete_tcp(struct tcp * tcp_){
 		sockhash_delete(tcp_->hash);
 		tcp_->hash = NULL;
 #endif
-		lock_delete(tcp_->term_lck);
-		tcp_->term_lck = NULL;
 		free(tcp_);
 	}
 }
@@ -1301,7 +1277,7 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 				errno = EQUEUE;
 				return -1;
 			}
-			while(client->connected && 0==emc_msg_zero_ref(msg)){}
+			while(client->connected && 0 == emc_msg_zero_ref(msg)){}
 			if(emc_msg_get_result(msg, &result) < 0){
 				return -1;
 			}
@@ -1314,7 +1290,7 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 		break;
 	case EMC_PUB:
 		if(EMC_LOCAL == tcp_->type){
-			struct tcp_unit unit = {flag,tcp_,msg};
+			struct tcp_unit unit = {flag, tcp_, msg};
 			if(EMC_NOWAIT == flag){
 				void * msg_r = emc_msg_alloc(emc_msg_buffer(msg), emc_msg_length(msg));
 				if(!msg_r) {

@@ -29,15 +29,27 @@
 #ifndef __EMC_LOCK_H_INCLUDED__
 #define __EMC_LOCK_H_INCLUDED__
 
+#include "../config.h"
+
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-struct emc_lock;
-struct emc_lock * lock_new();
-void lock_delete(struct emc_lock * lck);
-void lock_enter(struct emc_lock * lck);
-void lock_leave(struct emc_lock * lck);
+static emc_inline void emc_lock(volatile unsigned int * lock){
+#if defined (EMC_WINDOWS)
+	while(InterlockedExchange(lock, 1)){}
+#else
+	while(__sync_lock_test_and_set(lock, 1)){}
+#endif
+}
+
+static emc_inline void emc_unlock(volatile unsigned int * lock){
+#if defined (EMC_WINDOWS)
+	InterlockedDecrement(lock);
+#else
+	__sync_lock_release(lock);
+#endif
+}
 
 #ifdef __cplusplus
 }

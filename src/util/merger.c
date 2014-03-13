@@ -30,6 +30,7 @@
 #include "../emc.h"
 #include "merger.h"
 #include "queue.h"
+#include "lock.h"
 #include "memory/jemalloc.h"
 
 #define MERGER_DEFAULT_COUNT	(1024)
@@ -52,30 +53,10 @@ struct merger{
 	struct merger_unit	*	units;
 	struct emc_queue		idle;
 	// Represents the number of units assigned to the elements
-	volatile unsigned int	count;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION	lock;
-#else
-	pthread_mutex_t		lock;
-#endif
+	volatile uint			count;
+	volatile uint			lock;
 };
 #pragma pack()
-
-static void _merger_lock(struct merger * un){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&un->lock);
-#else
-	pthread_mutex_lock(&un->lock);
-#endif
-}
-
-static void _merger_unlock(struct merger * un){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&un->lock);
-#else
-	pthread_mutex_unlock(&un->lock);
-#endif
-}
 
 struct merger *merger_new(unsigned int count){
 	struct merger * un = (struct merger *)malloc(sizeof(struct merger));
@@ -92,36 +73,27 @@ struct merger *merger_new(unsigned int count){
 		emc_queue_init(&un->units[index].queue);
 		emc_queue_insert_tail(&un->idle, &un->units[index].queue);
 	}
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&un->lock);
-#else
-	pthread_mutex_init(&un->lock, NULL);
-#endif
 	return un;
 }
 
 void merger_delete(struct merger * un){
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&un->lock);
-#else
-	pthread_mutex_destroy(&un->lock);
-#endif
 	free(un->units);
 	free(un);
 }
 
 void* merger_alloc(struct merger * un){
 	struct emc_queue * head = NULL;
-	
-	_merger_lock(un);
+	struct merger_unit * unit = NULL;
+	emc_lock(&un->lock);
 	head = emc_queue_head(&un->idle);
 	if(!head){
-		_merger_unlock(un);
+		emc_unlock(&un->lock);
 		return NULL;
 	}
 	emc_queue_remove(head);
-	_merger_unlock(un);
-	return emc_queue_data(head, struct merger_unit, queue);
+	unit = emc_queue_data(head, struct merger_unit, queue);
+	emc_unlock(&un->lock);
+	return unit;
 }
 
 void merger_init(void * block, int len){
@@ -173,7 +145,7 @@ uint merger_time(void * block){
 
 void merger_free(struct merger * un, void * block){
 	struct merger_unit * unit = (struct merger_unit *)block;
-	_merger_lock(un);
+	emc_lock(&un->lock);
 	if(unit->buffer){
 		free_impl(unit->buffer);
 		unit->buffer = NULL;
@@ -182,5 +154,5 @@ void merger_free(struct merger * un, void * block){
 	}
 	emc_queue_init(&unit->queue);
 	emc_queue_insert_tail(&un->idle, &unit->queue);
-	_merger_unlock(un);
+	emc_unlock(&un->lock);
 }

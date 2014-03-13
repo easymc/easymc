@@ -750,7 +750,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 			semctl(client->evt,IPC_RMID,NULL);
 			client->evt = -1;
 #endif
-			if(0 == map_erase_nonlock(m,key)){
+			if(0 == map_erase(m,key)){
 				push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 				global_idle_connect_id(client->id);
 				client->connected = 0;
@@ -764,7 +764,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 
 static uint map_foreach_task_cb(struct map * m, int64 key, void * p, void * addition){
 	if(timeGetTime()-merger_time(p) > IPC_TASK_TIMEOUT){
-		if(0 == map_erase_nonlock(m, key)){
+		if(0 == map_erase(m, key)){
 			global_free_merger(p);
 			return 1;
 		}

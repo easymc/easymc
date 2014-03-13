@@ -28,6 +28,7 @@
 
 #include "../emc.h"
 #include "../config.h"
+#include "lock.h"
 #include "map.h"
 
 #pragma pack(1)
@@ -40,29 +41,10 @@ struct map{
 	struct map_node		*node;
 	volatile uint		size;
 	volatile uint		used;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION	lock;                    
-#else
-	pthread_mutex_t		lock;
-#endif
+	volatile uint		lock;
+	volatile uint		foreach;
 };
 #pragma pack()
-
-static __inline void lock_map(struct map * m){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&m->lock);
-#else
-	pthread_mutex_lock(&m->lock);
-#endif
-}
-
-static __inline void unlock_map(struct map * m){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&m->lock);
-#else
-	pthread_mutex_unlock(&m->lock);
-#endif
-}
 
 static int map_sort_swap(struct map * m, int64 key, void * val){
 	int low=0, mid=0, high=m->used-1;
@@ -117,28 +99,18 @@ struct map * create_map(int size){
 	m->size = size;
 	m->node = (struct map_node*)malloc(sizeof(struct map_node) * size);
 	memset(m->node, 0, sizeof(struct map_node) * size);
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&m->lock);
-#else
-	pthread_mutex_init(&m->lock,NULL);		
-#endif
 	return m;
 }
 
 void delete_map(struct map * m){
 	free(m->node);
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&m->lock);
-#else
-	pthread_mutex_destroy(&m->lock);		
-#endif
 	free(m);
 }
 
 int map_add(struct map * m, int64 key, void * val){
-	lock_map(m);
+	emc_lock(&m->lock);
 	if(map_search_cb(m, key) >= 0){
-		unlock_map(m);
+		emc_unlock(&m->lock);
 		return -1;
 	}
 	if(m->used >= m->size){
@@ -146,59 +118,83 @@ int map_add(struct map * m, int64 key, void * val){
 		m->size *= 2;
 	}
 	map_sort_swap(m, key, val);
-	unlock_map(m);
+	emc_unlock(&m->lock);
 	return 0;
 }
 
 int map_get(struct map * m, int64 key, void ** val){
-	int n = -1;
+	int n = -1, locked = 0;
 	if(val) *val = NULL;
-
-	lock_map(m);
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	if(!m->used){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	n = map_search_cb(m, key);
 	if(n < 0){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	if(val)	*val = m->node[n].p;
-	unlock_map(m);
+	if(locked){
+		emc_unlock(&m->lock);
+	}
 	return 0;
 }
 
 int map_set(struct map * m, int64 key, void * val){
-	int n = -1;
+	int n = -1, locked = 0;
 
-	lock_map(m);
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	if(!m->used){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	n = map_search_cb(m, key);
 	if(n < 0){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	m->node[n].p = val;
-	unlock_map(m);
+	if(locked){
+		emc_unlock(&m->lock);
+	}
 	return 0;
 }
 
 int	map_erase(struct map * m, int64 key){
-	int n = -1;
+	int n = -1, locked = 0;
 	struct map_node * _node = NULL;
 
-	lock_map(m);
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	if(!m->used){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	n = map_search_cb(m, key);
 	if(n < 0){
-		unlock_map(m);
+		if(locked){
+			emc_unlock(&m->lock);
+		}
 		return -1;
 	}
 	m->node[n].key = -1;
@@ -209,35 +205,17 @@ int	map_erase(struct map * m, int64 key){
 		memmove(m->node+index, m->node+index+1, (m->used-1-index)*(sizeof(struct map_node)));
 	}
 	m->used --;
-	unlock_map(m);
-	return 0;
-}
-
-int	map_erase_nonlock(struct map * m, int64 key){
-	int n = -1;
-	struct map_node * _node = NULL;
-	if(!m->used){
-		return -1;
+	if(locked){
+		emc_unlock(&m->lock);
 	}
-	n = map_search_cb(m, key);
-	if(n < 0){
-		return -1;
-	}
-	m->node[n].key = -1;
-	m->node[n].p = NULL;
-	_node = &m->node[n];
-	if(_node != &m->node[m->used-1]){
-		uint index = ((char*)_node-(char*)&m->node[0])/sizeof(struct map_node);
-		memmove(m->node+index, m->node+index+1, (m->used-1-index)*(sizeof(struct map_node)));
-	}
-	m->used --;
 	return 0;
 }
 
 void map_foreach(struct map * m, map_foreach_cb * cb, void * addition){
 	int index = 0;
 
-	lock_map(m);
+	emc_lock(&m->lock);
+	emc_lock(&m->foreach);
 	for(index=0; index<m->used; index++){
 		if(cb){
 			if(cb(m, m->node[index].key, m->node[index].p, addition)){
@@ -245,19 +223,20 @@ void map_foreach(struct map * m, map_foreach_cb * cb, void * addition){
 			}
 		}
 	}
-	unlock_map(m);
+	emc_unlock(&m->foreach);
+	emc_unlock(&m->lock);
 }
 
 uint map_size(struct map * m){
 	uint size = 0;
-	lock_map(m);
+	emc_lock(&m->lock);
 	size = m->used;
-	unlock_map(m);
+	emc_unlock(&m->lock);
 	return size;
 }
 
 void map_clear(struct map * m){
-	lock_map(m);
+	emc_lock(&m->lock);
 	m->used = 0;
-	unlock_map(m);
+	emc_unlock(&m->lock);
 }

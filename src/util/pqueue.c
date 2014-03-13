@@ -28,6 +28,7 @@
 
 #include "pqueue.h"
 #include "../config.h"
+#include "lock.h"
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
@@ -43,29 +44,9 @@ struct pqueue
 	 void						**units;
 	 unsigned int				used;
 	 unsigned int				size;
-#if defined (EMC_WINDOWS)
-	 CRITICAL_SECTION			lock;                    
-#else
-	 pthread_mutex_t			lock;
-#endif
+	 volatile unsigned int		lock;                    
 };
 #pragma pack()
-
-static __inline void _lock_queue(struct pqueue * queue){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&queue->lock);
-#else
-	pthread_mutex_lock(&queue->lock);
-#endif
-}
-
-static __inline void _unlock_queue(struct pqueue * queue){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&queue->lock);
-#else
-	pthread_mutex_unlock(&queue->lock);
-#endif
-}
 
 struct pqueue * create_pqueue()
 {
@@ -75,40 +56,30 @@ struct pqueue * create_pqueue()
 	queue->units = (void**)malloc(sizeof(void *) * PQUEUE_SIZE);
 	queue->size = PQUEUE_SIZE;
 	memset(queue->units, 0, sizeof(void *) * PQUEUE_SIZE);
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&queue->lock);
-#else
-	pthread_mutex_init(&queue->lock,NULL);		
-#endif
 	return queue;
 }
 
 void delete_pqueue(struct pqueue * queue){
 	if(queue){
-#if defined (EMC_WINDOWS)
-		DeleteCriticalSection(&queue->lock);
-#else
-		pthread_mutex_destroy(&queue->lock);		
-#endif
 		free(queue->units);
 		free(queue);
 	}
 }
 
 int pqueue_push(struct pqueue * queue, void * data){
-	_lock_queue(queue);
+	emc_lock(&queue->lock);
 	if(queue->used >= queue->size){
 		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
 		queue->size += PQUEUE_SIZE;
 	}
 	queue->units[queue->used] = data;
 	queue->used ++;
-	_unlock_queue(queue);
+	emc_unlock(&queue->lock);
 	return 0;
 }
 
 int pqueue_push_head(struct pqueue * queue, void * data){
-	_lock_queue(queue);
+	emc_lock(&queue->lock);
 	if(queue->used >= queue->size){
 		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
 		queue->size += PQUEUE_SIZE;
@@ -120,14 +91,14 @@ int pqueue_push_head(struct pqueue * queue, void * data){
 	} else {
 		queue->units[queue->used++] = data;
 	}
-	_unlock_queue(queue);
+	emc_unlock(&queue->lock);
 	return 0;
 }
 
 int pqueue_pop(struct pqueue * queue, void ** buf){
-	_lock_queue(queue);
+	emc_lock(&queue->lock);
 	if(!queue->used){
-		_unlock_queue(queue);
+		emc_unlock(&queue->lock);
 		return -1;
 	}
 	*buf = queue->units[0];
@@ -135,14 +106,14 @@ int pqueue_pop(struct pqueue * queue, void ** buf){
 	if(queue->used){
 		memmove(&queue->units[0], &queue->units[1], sizeof(void *) * queue->used);
 	}
-	_unlock_queue(queue);
+	emc_unlock(&queue->lock);
 	return 0;
 }
 
 unsigned int pqueue_size(struct pqueue * queue){
 	unsigned int size = 0;
-	_lock_queue(queue);
+	emc_lock(&queue->lock);
 	size = queue->used;
-	_unlock_queue(queue);
+	emc_unlock(&queue->lock);
 	return size;
 }

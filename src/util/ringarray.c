@@ -57,7 +57,7 @@ static void put_ordered_char(volatile char * buffer, uint offset, char flag){
 static int get_int_volatitle(volatile int * buffer, uint offset){
 	volatile int * addr = buffer+offset;
 	int result = *addr;
-	rmb();
+	emc_mb();
 	return result;
 }
 

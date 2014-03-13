@@ -29,6 +29,7 @@
 #include "../config.h"
 #include "../emc.h"
 #include "event.h"
+#include "lock.h"
 #include "uniquequeue.h"
 
 #define MAX_ARRAY_SIZE	(0x10000)
@@ -43,76 +44,46 @@ struct uniquequeue{
 	struct uniquenode	_array[MAX_ARRAY_SIZE];
 	volatile uint		used;
 	struct event		*wait;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION	lock;                    
-#else
-	pthread_mutex_t		lock;
-#endif
+	volatile uint		lock;                    
 };
 #pragma pack()
 
-
-static __inline void _lock_queue(struct uniquequeue * queue){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&queue->lock);
-#else
-	pthread_mutex_lock(&queue->lock);
-#endif
-}
-
-static __inline void _unlock_queue(struct uniquequeue * queue){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&queue->lock);
-#else
-	pthread_mutex_unlock(&queue->lock);
-#endif
-}
 struct uniquequeue * create_uqueue(){
 	struct uniquequeue * uq = (struct uniquequeue *)malloc(sizeof(struct uniquequeue));
 	if(!uq)return NULL;
 	memset(uq, 0, sizeof(struct uniquequeue));
 	uq->wait = create_event();
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&uq->lock);
-#else
-	pthread_mutex_init(&uq->lock, NULL);		
-#endif
 	return uq;
 }
 
 void delete_uqueue(struct uniquequeue * uq){
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&uq->lock);
-#else
-	pthread_mutex_destroy(&uq->lock);		
-#endif
 	delete_event(uq->wait);
 	free(uq);
 }
 
 uint push_uqueue(struct uniquequeue * uq, int v, void * p){
-	_lock_queue(uq);
+	emc_lock(&uq->lock);
 	if(uq->_map[v] > 0){
-		_unlock_queue(uq);
+		emc_unlock(&uq->lock);
 		return 0;
 	}
 	if(uq->used >= MAX_ARRAY_SIZE){
-		_unlock_queue(uq);
+		emc_unlock(&uq->lock);
 		return -1;
 	}
 	uq->_array[uq->used].id = v;
 	uq->_array[uq->used ++].addition = p;
 	uq->_map[v] = 1;
 	post_event(uq->wait);
-	_unlock_queue(uq);
+	emc_unlock(&uq->lock);
 	return 0;
 }
 
 int pop_uqueue(struct uniquequeue * uq, void ** p){
 	int v = -1;
-	_lock_queue(uq);
+	emc_lock(&uq->lock);
 	if(!uq->used){
-		_unlock_queue(uq);
+		emc_unlock(&uq->lock);
 		return -1;
 	}
 	v = uq->_array[0].id;
@@ -124,7 +95,7 @@ int pop_uqueue(struct uniquequeue * uq, void ** p){
 	}
 	uq->_map[v] = 0;
 	uq->used --;
-	_unlock_queue(uq);
+	emc_unlock(&uq->lock);
 	return v;
 }
 

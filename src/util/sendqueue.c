@@ -29,6 +29,7 @@
 #include "../config.h"
 #include "../emc.h"
 #include "queue.h"
+#include "lock.h"
 #include "sendqueue.h"
 
 #define SQ_DEFAULT_SIZE	(1024)
@@ -49,30 +50,10 @@ struct sendqueue{
 	struct sendqueue_unit		*units[SQ_DEFAULT_SIZE];
 	struct emc_queue			idle;
 	uint						total;
-#if defined (EMC_WINDOWS)
-	CRITICAL_SECTION			lock;                    
-#else
-	pthread_mutex_t				lock;
-#endif
+	volatile uint				lock;                    
 };
 
 #pragma pack()
-
-static __inline void _lock_queue(struct sendqueue * sq){
-#if defined (EMC_WINDOWS)
-	EnterCriticalSection(&sq->lock);
-#else
-	pthread_mutex_lock(&sq->lock);
-#endif
-}
-
-static __inline void _unlock_queue(struct sendqueue * sq){
-#if defined (EMC_WINDOWS)
-	LeaveCriticalSection(&sq->lock);
-#else
-	pthread_mutex_unlock(&sq->lock);
-#endif
-}
 
 struct sendqueue * create_sendqueue(){
 	uint index=0;
@@ -89,11 +70,6 @@ struct sendqueue * create_sendqueue(){
 		emc_queue_init(&(sq->units[sq->total-1]+index)->queue);
 		emc_queue_insert_tail(&sq->idle, &(sq->units[sq->total-1]+index)->queue);
 	}
-#if defined (EMC_WINDOWS)
-	InitializeCriticalSection(&sq->lock);
-#else
-	pthread_mutex_init(&sq->lock,NULL);		
-#endif
 	return sq;
 }
 
@@ -102,11 +78,6 @@ void delete_sendqueue(struct sendqueue * sq){
 	for(index=0; index<sq->total; index++){
 		free(sq->units[index]);
 	}
-#if defined (EMC_WINDOWS)
-	DeleteCriticalSection(&sq->lock);
-#else
-	pthread_mutex_destroy(&sq->lock);		
-#endif
 	free(sq);
 }
 
@@ -115,9 +86,9 @@ int sendqueue_push(struct sendqueue * sq, int id, void * data){
 	struct sendqueue_unit * unit = NULL;
 	struct emc_queue * head = NULL;
 	if(id<0 || id >= EMC_SOCKETS_DEFAULT) return -1;
-	_lock_queue(sq);
+	emc_lock(&sq->lock);
 	if(sq->_map[id].count >= SQ_DEFAULT_SIZE){
-		_unlock_queue(sq);
+		emc_unlock(&sq->lock);
 		return -1;
 	}
 	if(emc_queue_empty(&sq->idle)){
@@ -130,7 +101,7 @@ int sendqueue_push(struct sendqueue * sq, int id, void * data){
 	}
 	head = emc_queue_head(&sq->idle);
 	if(!head){
-		_unlock_queue(sq);
+		emc_unlock(&sq->lock);
 		return -1;
 	}
 	emc_queue_remove(head);
@@ -139,7 +110,7 @@ int sendqueue_push(struct sendqueue * sq, int id, void * data){
 	unit->data = data;
 	emc_queue_insert_tail(&sq->_map[id].queue, head);
 	sq->_map[id].count ++;
-	_unlock_queue(sq);
+	emc_unlock(&sq->lock);
 	return 0;
 }
 
@@ -148,9 +119,9 @@ int sendqueue_push_head(struct sendqueue * sq, int id, void * data){
 	struct sendqueue_unit * unit = NULL;
 	struct emc_queue * head = NULL;
 	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return -1;
-	_lock_queue(sq);
+	emc_lock(&sq->lock);
 	if(sq->_map[id].count >= SQ_DEFAULT_SIZE){
-		_unlock_queue(sq);
+		emc_unlock(&sq->lock);
 		return -1;
 	}
 	if(emc_queue_empty(&sq->idle)){
@@ -163,7 +134,7 @@ int sendqueue_push_head(struct sendqueue * sq, int id, void * data){
 	}
 	head = emc_queue_head(&sq->idle);
 	if(!head){
-		_unlock_queue(sq);
+		emc_unlock(&sq->lock);
 		return -1;
 	}
 	emc_queue_remove(head);
@@ -172,7 +143,7 @@ int sendqueue_push_head(struct sendqueue * sq, int id, void * data){
 	unit->data = data;
 	emc_queue_insert_head(&sq->_map[id].queue, head);
 	sq->_map[id].count ++;
-	_unlock_queue(sq);
+	emc_unlock(&sq->lock);
 	return 0;
 }
 
@@ -180,10 +151,10 @@ int sendqueue_pop(struct sendqueue * sq, int id, void ** data){
 	struct emc_queue * head = NULL;
 	struct sendqueue_unit * unit = NULL;
 	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return -1;
-	_lock_queue(sq);
+	emc_lock(&sq->lock);
 	head = emc_queue_head(&sq->_map[id].queue);
 	if(!head){
-		_unlock_queue(sq);
+		emc_unlock(&sq->lock);
 		return -1;
 	}
 	emc_queue_remove(head);
@@ -194,15 +165,15 @@ int sendqueue_pop(struct sendqueue * sq, int id, void ** data){
 	}
 	emc_queue_init(head);
 	emc_queue_insert_tail(&sq->idle, head);
-	_unlock_queue(sq);
+	emc_unlock(&sq->lock);
 	return 0;
 }
 
 uint sendqueue_size(struct sendqueue * sq, int id){
 	uint size = 0;
 	if(id < 0 || id >= EMC_SOCKETS_DEFAULT) return 0;
-	_lock_queue(sq);
+	emc_lock(&sq->lock);
 	size = sq->_map[id].count;
-	_unlock_queue(sq);
+	emc_unlock(&sq->lock);
 	return size;
 }
