@@ -100,7 +100,7 @@ int unpack_add(void* block, char * data, int len){
 	return (unit->len+len)>UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE-unit->len):len;
 }
 
-static ushort _unpack_get_peer(struct unpack_unit * unit, char * buffer){
+static ushort unpack_get_peer(struct unpack_unit * unit, char * buffer){
 	ushort length=0, len=0;
 	char *rpos = unit->buffer;
 	while(unit->len && EMC_HEAD != *(ushort*)rpos){
@@ -137,7 +137,7 @@ void unpack_get(void * block, unpack_get_data * cb, int id, void * args, char * 
 	unsigned short length = 0;
 
 	if(unit->buffer){
-		while((length = _unpack_get_peer(unit, buffer))){
+		while((length = unpack_get_peer(unit, buffer))){
 			if(cb){
 				cb(buffer, length, id, args);
 			}
