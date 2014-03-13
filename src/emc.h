@@ -240,7 +240,7 @@ EMC_EXP int EMC_BIND emc_recv(int plug, void ** msg, int flag);
 EMC_EXP int EMC_BIND emc_send(int plug, void * msg, int flag);
 
 // Monitoring the device event
-EMC_EXP int EMC_BIND emc_monitor(int device, struct monitor_data * data);
+EMC_EXP int EMC_BIND emc_monitor(int device, struct monitor_data * data, int flag);
 
 #ifdef __cplusplus
 }

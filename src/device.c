@@ -140,7 +140,7 @@ void emc_destory(int device){
 	return 0;
 }
 
-int emc_monitor(int device, struct monitor_data * data){
+int emc_monitor(int device, struct monitor_data * data, int flag){
 	struct monitor_data * md = NULL;
 	struct emc_device * ed = (struct emc_device *)global_get_device(device);
 	if(!ed || !ed->mmq){
@@ -148,8 +148,12 @@ int emc_monitor(int device, struct monitor_data * data){
 		return -1;
 	}
 	if(!check_ringqueue_multiple(ed->mmq)){
-		if(0 != wait_ringqueue(ed->mmq)){
+		if(EMC_NOWAIT == flag){
 			return -1;
+		}else {
+			if(0 != wait_ringqueue(ed->mmq)){
+				return -1;
+			}
 		}
 	}
 	if(pop_ringqueue_multiple(ed->mmq, (void **)&md) < 0){

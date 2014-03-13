@@ -56,7 +56,7 @@ static emc_result_t EMC_CALL OnMonitorDevice(void *p){
 	int device=pa->device;
 	struct monitor_data data={0};
 	while(!pa->exit){
-		if(0==emc_monitor(device,&data)){
+		if(0==emc_monitor(device,&data, 0)){
 			switch(data.events){
 			case EMC_EVENT_CONNECT:
 				printf("client connected server,ip=%s,port=%ld,id=%ld\n",data.ip,data.port,data.id);
