@@ -63,6 +63,8 @@ struct global{
 	struct sendqueue	*sq;
 	// Reconnect map
 	struct map			*rcmq;
+	// reconnect thread
+	emc_result_t		reconnect;
 	// exit
 	volatile uint		exit;
 };
@@ -81,7 +83,7 @@ static uint reconnect_map_foreach_cb(struct map * m, int64 key, void * p, void *
 	return 0;
 }
 
-static emc_result_t EMC_CALL  global_reconnect_cb(void * args){
+static emc_cb_t EMC_CALL  global_reconnect_cb(void * args){
 	while(!self.exit){
 		map_foreach(self.rcmq, reconnect_map_foreach_cb, NULL);
 		nsleep(100);
@@ -128,12 +130,13 @@ static void global_init(void){
 		self.sq = create_sendqueue();
 		self.rcmq = create_map(EMC_SOCKETS_DEFAULT);
 		srand((uint)time(NULL));
-		create_thread(global_reconnect_cb, NULL);
+		self.reconnect = emc_thread(global_reconnect_cb, NULL);
 	}
 }
 
 void global_term(void){
 	self.exit = 1;
+	emc_thread_join(self.reconnect);
 #if defined (EMC_WINDOWS)
 	WSACleanup();
 #endif
@@ -240,10 +243,6 @@ int global_push_head_sendqueue(int id, void * p){
 
 int global_pop_sendqueue(int id, void ** p){
 	return sendqueue_pop(self.sq, id, p);
-}
-
-unsigned int global_sendqueue_size(int id){
-	return sendqueue_size(self.sq, id);
 }
 
 int global_add_reconnect(int id, on_reconnect_cb * cb, void * client, void * addition){

@@ -32,7 +32,7 @@
 #include "lock.h"
 #include "uniquequeue.h"
 
-#define MAX_ARRAY_SIZE	(0x10000)
+#define UNIQUE_SIZE	(0x10000)
 
 #pragma pack(1)
 struct uniquenode{
@@ -40,8 +40,8 @@ struct uniquenode{
 	void			*	addition;
 };
 struct uniquequeue{
-	volatile int		ids[MAX_ARRAY_SIZE];
-	struct uniquenode	queue[MAX_ARRAY_SIZE];
+	volatile int		ids[UNIQUE_SIZE];
+	struct uniquenode	queue[UNIQUE_SIZE];
 	volatile uint		used;
 	struct event		*wait;
 	volatile uint		lock;                    
@@ -67,7 +67,7 @@ uint push_uqueue(struct uniquequeue * uq, int v, void * p){
 		emc_unlock(&uq->lock);
 		return 0;
 	}
-	if(uq->used >= MAX_ARRAY_SIZE){
+	if(uq->used >= UNIQUE_SIZE){
 		emc_unlock(&uq->lock);
 		return -1;
 	}
@@ -91,7 +91,7 @@ int pop_uqueue(struct uniquequeue * uq, void ** p){
 		*p = uq->queue[0].addition;
 	}
 	if(uq->used > 1){
-		memmove(uq->queue, uq->queue+1, sizeof(int) * (uq->used-1));
+		memmove(uq->queue, uq->queue+1, sizeof(struct uniquenode) * (uq->used-1));
 	}
 	uq->ids[v] = 0;
 	uq->used --;
@@ -99,8 +99,8 @@ int pop_uqueue(struct uniquequeue * uq, void ** p){
 	return v;
 }
 
-int wait_uqueue(struct uniquequeue * uq){
-	return wait_event(uq->wait, -1);
+int wait_uqueue(struct uniquequeue * uq, int timeout){
+	return wait_event(uq->wait, timeout);
 }
 
 void post_uqueue(struct uniquequeue * uq){

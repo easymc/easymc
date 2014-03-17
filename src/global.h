@@ -60,7 +60,6 @@ void global_idle_connect_id(int id);
 int global_push_sendqueue(int id, void * p);
 int global_push_head_sendqueue(int id, void * p);
 int global_pop_sendqueue(int id, void ** p);
-unsigned int global_sendqueue_size(int id);
 
 void *global_alloc_monitor();
 void global_free_monitor(void * data);

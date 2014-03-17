@@ -40,7 +40,6 @@ extern "C"{
 	int sendqueue_push(struct sendqueue * sq, int id, void * data);
 	int sendqueue_push_head(struct sendqueue * sq, int id, void * data);
 	int sendqueue_pop(struct sendqueue * sq, int id, void ** data);
-	unsigned int sendqueue_size(struct sendqueue * sq, int id);
 
 #ifdef __cplusplus
 }

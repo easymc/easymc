@@ -41,7 +41,7 @@ extern "C"{
 	void				delete_uqueue(struct uniquequeue * uq);
 	unsigned int		push_uqueue(struct uniquequeue * uq, int v, void * p);
 	int					pop_uqueue(struct uniquequeue * uq, void ** p);
-	int					wait_uqueue(struct uniquequeue * uq);
+	int					wait_uqueue(struct uniquequeue * uq, int timeout);
 	void				post_uqueue(struct uniquequeue * uq);
 
 #ifdef __cplusplus

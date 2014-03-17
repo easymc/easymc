@@ -42,13 +42,16 @@ unsigned int timeGetTime(){
 }
 #endif
 
-int create_thread(emc_thread_cb * cb, void * args){
+emc_result_t emc_thread(emc_thread_cb * cb, void * args){
 	thread_t thrd = 0;
-	return thread_create(&thrd, NULL, cb, args);
+	if(0 == thread_create(&thrd, NULL, cb, args)){
+		return thrd;
+	}
+	return 0;
 }
 
-int emc_thread(emc_thread_cb * cb, void * args){
-	return create_thread(cb, args);
+int emc_thread_join(emc_result_t ert){
+	return thread_join(ert);
 }
 
 unsigned int get_thread_id(){

@@ -30,7 +30,11 @@
 #ifndef __EMC_THREAD_H_INCLUDED__
 #define __EMC_THREAD_H_INCLUDED__
 
-#ifndef _WIN32
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if !defined(EMC_WINDOWS)
 
 #include <pthread.h>
 #include <unistd.h>
@@ -40,30 +44,28 @@ typedef void*			thread_result_t;
 typedef pthread_t       thread_t;
 typedef thread_result_t thread_bc(void *args);
 
-#define thread_self    pthread_self
-#define thread_create  pthread_create
+#define thread_self		pthread_self
+#define thread_create	pthread_create
 
 #else
 
 #include <winsock2.h>
 #include <process.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef unsigned int thread_t;
+typedef HANDLE thread_t;
 typedef unsigned int thread_result_t;
 #define THREAD_CALL __stdcall
 typedef thread_result_t __stdcall thread_bc(void * args);
 
-thread_t thread_self();
+unsigned int thread_self();
 int thread_create(thread_t * thrd, void * attr, thread_bc bc, void * args);
+
+#endif
+
+int thread_join(thread_t thrd);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 #endif

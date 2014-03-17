@@ -81,15 +81,16 @@ void sockhash_delete(struct sockhash * m) {
 }
 
 int sockhash_search(struct sockhash * m, int fd) {
-	int hash = -1;
+	int hash = -1, id = -1;
 	struct node * n = NULL;
 	emc_lock(&m->lock);
 	hash = fd & (m->size-1);
 	n = m->hash[hash];
 	while(n){
 		if (n->fd == fd){
+			id = n->id;
 			emc_unlock(&m->lock);
-			return n->id;
+			return id;
 		}
 		n = n->next;
 	}

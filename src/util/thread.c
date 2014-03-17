@@ -29,13 +29,27 @@
 #include "thread.h"
 
 #if defined (EMC_WINDOWS)
-thread_t thread_self(){
+unsigned int thread_self(){
 	return GetCurrentThreadId();
 }
 
 int thread_create(thread_t * thrd, void * attr, thread_bc bc, void * args){
-	HANDLE h = (HANDLE)_beginthreadex(NULL, 0,bc, args, 0, thrd);
+	thread_t h = (thread_t)_beginthreadex(NULL, 0,bc, args, 0, NULL);
+	if(thrd){
+		*thrd = h;
+	}
 	return h>0?0:GetLastError();
 }
 
 #endif
+
+int thread_join(thread_t thrd){
+#if defined (EMC_WINDOWS)
+	if(WAIT_OBJECT_0 == WaitForSingleObject(thrd, INFINITE)){
+		return 0;
+	}
+	return -1;
+#else
+	return pthread_join(thrd, NULL);
+#endif
+}

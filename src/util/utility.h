@@ -33,11 +33,9 @@
 extern "C" {
 #endif
 
-#ifndef _WIN32
+#if !defined (EMC_WINDOWS)
 	unsigned int timeGetTime();
 #endif
-	int create_thread(emc_thread_cb * cb, void * args);
-
 	unsigned int get_thread_id();
 
 	unsigned int check_local_machine(int ip);

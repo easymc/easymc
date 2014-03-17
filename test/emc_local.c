@@ -38,7 +38,7 @@ struct para{
 	int exit;
 };
 
-static emc_result_t EMC_CALL OnRecvMsg(void *p){
+static emc_cb_t EMC_CALL OnRecvMsg(void *p){
 	void *msg=NULL;
 	struct para *pa=(struct para *)p;
 	int plug=pa->plug;
@@ -59,7 +59,7 @@ static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	return 0;
 }
 
-static emc_result_t EMC_CALL OnMonitorDevice(void *p){
+static emc_cb_t EMC_CALL OnMonitorDevice(void *p){
 	struct para *pa=(struct para *)p;
 	int device=pa->device;
 	struct monitor_data data={0};
@@ -93,6 +93,8 @@ int main(int argc, char* argv[]){
 	pa.exit=0;
 	pa.device = device;
 	emc_set(device,EMC_OPT_MONITOR|EMC_OPT_CONTROL,&monitor,sizeof(int));
+	monitor = 3;
+	emc_set(device,EMC_OPT_THREAD,&monitor,sizeof(int));
 	printf("Input a port to bind:");
 	scanf("%ld",&ch);
 	plug = emc_plug(device);
@@ -102,6 +104,8 @@ int main(int argc, char* argv[]){
 	if(emc_bind(plug,NULL,ch) < 0){
 		printf("emc_bing fail,errno=%d,msg=%s\n",emc_errno(),emc_errno_str(emc_errno()));
 	}
+	emc_thread(OnRecvMsg,(void *)&pa);
+	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnRecvMsg,(void *)&pa);
 	emc_thread(OnMonitorDevice,(void *)&pa);
 //	emc_connect(plug2, EMC_REQ, "127.0.0.1", 9002);

@@ -30,7 +30,7 @@
 #define __EMC_H_INCLUDED__
 
 // Version control
-#define EMC_VERSION 0.3
+#define EMC_VERSION 0.4
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,13 +61,15 @@ typedef unsigned long long uint64;
 #	endif
 #endif
 #if defined _WIN32
-typedef uint		emc_result_t;
-#define EMC_CALL	__stdcall
-#define EMC_BIND	__cdecl
+typedef uint				emc_cb_t;
+typedef void*				emc_result_t;
+#define EMC_CALL			__stdcall
+#define EMC_BIND			__cdecl
 #else
-typedef void*		emc_result_t;
-#define EMC_CALL	__attribute__((__stdcall__))
-#define EMC_BIND	__attribute__((__cdecl__))
+typedef void*				emc_cb_t;
+typedef unsigned long int	emc_result_t;
+#define EMC_CALL			__attribute__((__stdcall__))
+#define EMC_BIND			__attribute__((__cdecl__))
 #endif
 
 /* Errors */
@@ -196,9 +198,11 @@ EMC_EXP int EMC_BIND emc_errno(void);
 EMC_EXP const char * EMC_BIND emc_errno_str(int errn);
 
 // Thread callback function type
-typedef emc_result_t EMC_CALL emc_thread_cb(void *);
+typedef emc_cb_t EMC_CALL emc_thread_cb(void *);
 // Thread function
-EMC_EXP int EMC_BIND emc_thread(emc_thread_cb * cb, void * args);
+EMC_EXP emc_result_t EMC_BIND emc_thread(emc_thread_cb * cb, void * args);
+// Wait thread end
+EMC_EXP int EMC_BIND emc_thread_join(emc_result_t ert);
 
 // Message function definition.
 EMC_EXP void * EMC_BIND emc_msg_alloc(void * data, uint size);

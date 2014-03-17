@@ -228,10 +228,15 @@ void map_foreach(struct map * m, map_foreach_cb * cb, void * addition){
 }
 
 uint map_size(struct map * m){
-	uint size = 0;
-	emc_lock(&m->lock);
+	uint size = 0, locked = 0;
+	if(!m->foreach){
+		emc_lock(&m->lock);
+		locked = 1;
+	}
 	size = m->used;
-	emc_unlock(&m->lock);
+	if(locked){
+		emc_unlock(&m->lock);
+	}
 	return size;
 }
 

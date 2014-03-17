@@ -37,7 +37,7 @@ struct para{
 	int exit;
 };
 
-static emc_result_t EMC_CALL OnRecvMsg(void *p){
+static emc_cb_t EMC_CALL OnRecvMsg(void *p){
 	struct para *pa=(struct para *)p;
 	int plug=pa->plug;
 	void *msg=NULL;
@@ -51,7 +51,7 @@ static emc_result_t EMC_CALL OnRecvMsg(void *p){
 	return 0;
 }
 
-static emc_result_t EMC_CALL OnMonitorDevice(void *p){
+static emc_cb_t EMC_CALL OnMonitorDevice(void *p){
 	struct para *pa=(struct para *)p;
 	int device=pa->device;
 	struct monitor_data data={0};
