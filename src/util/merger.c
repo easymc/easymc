@@ -123,9 +123,9 @@ int merger_add(void * block, int no, int start, char * data, int len){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	
 	memcpy(unit->data+(unit->packets * sizeof(int))+start, data, len);
-	if(!*(int *)(unit->data + (no*sizeof(int)))){
+	if(!*(int *)(unit->data + (no * sizeof(int)))){
 		unit->len += len;
-		*(int *)(unit->data + (no*sizeof(int))) = 1;
+		*(int *)(unit->data + (no * sizeof(int))) = 1;
 	}
 	unit->time = timeGetTime();
 	return len;
