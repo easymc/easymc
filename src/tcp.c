@@ -38,7 +38,6 @@
 #include "util/ringqueue.h"
 #include "util/uniquequeue.h"
 #include "util/lock.h"
-#include "util//memory/jemalloc.h"
 #include "global.h"
 #include "device.h"
 #include "plug.h"
@@ -301,7 +300,7 @@ static void tcp_release_msg(struct tcp_data * data){
 			emc_msg_free(data->msg);
 		}
 		data->msg = NULL;
-		free_impl(data);
+		free(data);
 	}
 }
 
@@ -513,7 +512,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	if(EMC_LOCAL == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
 		global_idle_connect_id(id);
-		free_impl(client);
+		free(client);
 		hashmap_erase(tcp_->server->connection, id);
 	}else if(EMC_REMOTE == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
@@ -566,7 +565,7 @@ static void process_recv(struct tcp * tcp_, struct tcp_area * area, int id){
 }
 
 static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort cmd, int flag, void * msg){
-	struct tcp_data * data = (struct tcp_data *)malloc_impl(sizeof(struct tcp_data));
+	struct tcp_data * data = (struct tcp_data *)malloc(sizeof(struct tcp_data));
 	if(!data) return -1;
 
 	data->flag = EMC_LIVE;
@@ -581,10 +580,12 @@ static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort c
 	if(global_push_sendqueue(client->id, data) < 0){
 		post_uqueue(client->area->wmq);
 		emc_msg_ref_dec(msg);
+		free(data);
 		return -1;
 	}else{
 		if(push_uqueue(client->area->wmq, client->id, client->tcp_) < 0){
 			emc_msg_ref_dec(msg);
+			free(data);
 			return -1;
 		}
 	}
@@ -725,7 +726,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 		_close_socket(fd);
 		return -1;
 	}
-	client = (struct tcp_client*)malloc_impl(sizeof(struct tcp_client));
+	client = (struct tcp_client*)malloc(sizeof(struct tcp_client));
 	if(!client){
 		_close_socket(fd);
 		return -1;
@@ -740,13 +741,13 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 	client->completed = 0;
 	if(tcp_add_event(area, client, EMC_READ) < 0){
 		global_idle_connect_id(client->id);
-		free_impl(client);
+		free(client);
 		_close_socket(fd);
 		return -1;
 	}
 	if(hashmap_insert(tcp_->server->connection, client->id, client) < 0){
 		global_idle_connect_id(client->id);
-		free_impl(client);
+		free(client);
 		_close_socket(fd);
 		return -1;
 	}

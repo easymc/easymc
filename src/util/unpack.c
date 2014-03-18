@@ -31,7 +31,6 @@
 #include "unpack.h"
 #include "queue.h"
 #include "lock.h"
-#include "memory/jemalloc.h"
 
 #define UNPACK_BUFFER_SIZE		(16392)
 #define UNPACK_DEFAULT_COUNT	(1024)
@@ -92,7 +91,7 @@ void* unpack_alloc(struct unpack * un){
 int unpack_add(void* block, char * data, int len){
 	struct unpack_unit * unit = (struct unpack_unit *)block;
 	if(!unit->buffer){
-		unit->buffer = (char*)malloc_impl(UNPACK_BUFFER_SIZE);
+		unit->buffer = (char*)malloc(UNPACK_BUFFER_SIZE);
 		memset(unit->buffer, 0, UNPACK_BUFFER_SIZE);
 	}
 	memcpy(unit->buffer+unit->len, data, (unit->len+len)>UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE-unit->len):len);
@@ -143,7 +142,7 @@ void unpack_get(void * block, unpack_get_data * cb, int id, void * args, char * 
 			}
 		}
 		if(!unit->len){
-			free_impl(unit->buffer);
+			free(unit->buffer);
 			unit->buffer = NULL;
 		}
 	}
@@ -153,7 +152,7 @@ void unpack_free(struct unpack * un, void * block){
 	struct unpack_unit * unit = (struct unpack_unit *)block;
 	emc_lock(&un->lock);
 	if(unit->buffer){
-		free_impl(unit->buffer);
+		free(unit->buffer);
 		unit->buffer = NULL;
 	}
 	emc_queue_init(&unit->queue);

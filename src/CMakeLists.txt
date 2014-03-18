@@ -43,14 +43,6 @@ set (	EMC_SOURCES
 	msg.h
 	plug.h
 	common.h
-	util/memory/jemalloc.h
-	util/memory/jemalloc_config.h
-	util/memory/jemalloc_types.h
-	util/memory/linkedlist.h
-	util/memory/osx_zone_types.h
-	util/memory/ql.h
-	util/memory/qr.h
-	util/memory/rb.h
 	util/hashmap.h
 	util/queue.h
 	util/ringqueue.h
@@ -86,7 +78,6 @@ set (	EMC_SOURCES
 	util/ringbuffer.c
 	util/ringarray.c
 	util/uniquequeue.c
-	util/memory/jemalloc.c
 )
 
 add_library (easymc SHARED ${EMC_SOURCES})

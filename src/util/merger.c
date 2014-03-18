@@ -31,7 +31,6 @@
 #include "merger.h"
 #include "queue.h"
 #include "lock.h"
-#include "memory/jemalloc.h"
 
 #define MERGER_DEFAULT_COUNT	(1024)
 
@@ -102,7 +101,7 @@ void merger_init(void * block, int len, int packets){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	if(unit->data){
 		if(unit->total < len || unit->packets < packets){
-			free_impl(unit->data);
+			free(unit->data);
 			unit->data = NULL;
 			unit->total = 0;
 			unit->len = 0;
@@ -111,7 +110,7 @@ void merger_init(void * block, int len, int packets){
 		}
 	}
 	if(!unit->data){
-		unit->data = (char *)malloc_impl(packets * sizeof(int) + len);
+		unit->data = (char *)malloc(packets * sizeof(int) + len);
 		memset(unit->data, 0, packets * sizeof(int) + len);
 	}
 	unit->packets = packets;
@@ -138,7 +137,7 @@ int merger_get(void * block, merger_get_cb * cb, int id, void * addition){
 		if(cb){
 			cb(unit->data, unit->total, id, addition);
 		}
-		free_impl(unit->data);
+		free(unit->data);
 		unit->data = NULL;
 		unit->total = 0;
 		unit->packets = 0;
@@ -156,7 +155,7 @@ void merger_free(struct merger * un, void * block){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	emc_lock(&un->lock);
 	if(unit->data){
-		free_impl(unit->data);
+		free(unit->data);
 		unit->data = NULL;
 		unit->total = 0;
 		unit->packets = 0;

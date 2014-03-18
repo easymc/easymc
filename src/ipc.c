@@ -34,7 +34,6 @@
 #include "util/ringqueue.h"
 #include "util/ringbuffer.h"
 #include "util/ringarray.h"
-#include "util/memory/jemalloc.h"
 #include "global.h"
 #include "common.h"
 #include "device.h"
@@ -226,7 +225,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 			ushort mode = *(ushort *)data;
 
 			// Process new ipc connections
-			client = (struct ipc_client *)malloc_impl(sizeof(struct ipc_client));
+			client = (struct ipc_client *)malloc(sizeof(struct ipc_client));
 			if(client){
 				client->mode = mode;
 				client->id = global_get_connect_id();
@@ -236,14 +235,14 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 				client->evt = OpenSemaphore(SEMAPHORE_ALL_ACCESS,TRUE,name);
 				if(!client->evt){
 					global_idle_connect_id(client->id);
-					free_impl(client);
+					free(client);
 					return;
 				}
 #else
 				client->evt = semget(*(uint *)(data+sizeof(ushort)),0,IPC_CREAT|0600);
 				if(client->evt<0){
 					global_idle_connect_id(client->id);
-					free_impl(client);
+					free(client);
 					return ;
 				}
 #endif
@@ -265,7 +264,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 #else
 					semctl(client->evt, 0, IPC_RMID, NULL);
 #endif
-					free_impl(client);
+					free(client);
 				}else{
 					client->connected = 1;
 					client->time = timeGetTime();
@@ -277,7 +276,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 #else
 						semctl(client->evt, 0, IPC_RMID, NULL);
 #endif
-						free_impl(client);
+						free(client);
 					}
 				}
 				// If you set the monitor to throw on accept events
@@ -314,7 +313,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 				if(0 == map_erase(ipc_->server->connection, id)){
 					push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 					global_idle_connect_id(id);
-					free_impl(client);
+					free(client);
 				}
 			}
 		}else if(EMC_REMOTE == ipc_->type){
@@ -677,7 +676,7 @@ static uint ipc_send_pub_foreach_cb(struct map * m, int64 key, void * p, void * 
 		struct ipc * ipc_ = unit->ipc_;
 		struct ipc_data * data = NULL;
 
-		data = (struct ipc_data *)malloc_impl(sizeof(struct ipc_data));
+		data = (struct ipc_data *)malloc(sizeof(struct ipc_data));
 		if(data){
 			data->id = key;
 			data->ipc_ = ipc_;
@@ -686,7 +685,7 @@ static uint ipc_send_pub_foreach_cb(struct map * m, int64 key, void * p, void * 
 			emc_msg_ref_add(unit->msg);
 			if(push_ringqueue(ipc_->sq, data) < 0){
 				emc_msg_ref_dec(unit->msg);
-				free_impl(data);
+				free(data);
 			}
 		}
 	}
@@ -776,7 +775,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 				push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 				global_idle_connect_id(client->id);
 				client->connected = 0;
-				free_impl(client);
+				free(client);
 				return 1;
 			}
 		}
@@ -880,7 +879,7 @@ static emc_cb_t EMC_CALL ipc_send_cb(void * args){
 			if(EMC_NOWAIT == data->flag){
 				emc_msg_free(data->msg);
 			}
-			free_impl(data);
+			free(data);
 		}
 	}
 	return (emc_cb_t)0;
@@ -1199,7 +1198,7 @@ int close_ipc(struct ipc * ipc_, int id){
 	if(0 == map_erase(ipc_->server->connection, id)){
 		push_ringarray((struct ringarray *)(ipc_->buffer+sizeof(uint)), client->locate);
 		global_idle_connect_id(id);
-		free_impl(client);
+		free(client);
 	}
 	return 0;
 }
@@ -1225,11 +1224,11 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		void * msg_r = NULL;
 		struct ipc_data * data = NULL;
 		
-		data = (struct ipc_data *)malloc_impl(sizeof(struct ipc_data));
+		data = (struct ipc_data *)malloc(sizeof(struct ipc_data));
 		if(!data) return -1;
 		msg_r=emc_msg_alloc(emc_msg_buffer(msg), emc_msg_length(msg));
 		if(!msg_r){
-			free_impl(data);
+			free(data);
 			errno = ENOMEM;
 			return -1;
 		}
@@ -1241,7 +1240,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		emc_msg_ref_add(msg_r);
 		if(EMC_PUB != emc_msg_get_mode(msg_r)){
 			if(push_ringqueue(ipc_->sq, data) < 0){
-				free_impl(data);
+				free(data);
 				emc_msg_free(msg_r);
 				errno = EQUEUE;
 				return -1;

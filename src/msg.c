@@ -28,7 +28,6 @@
 
 #include "config.h"
 #include "global.h"
-#include "util/memory/jemalloc.h"
 #include "emc.h"
 #include "msg.h"
 
@@ -68,7 +67,7 @@ static uint msg_check_live(const void * msg){
 }
 
 void *emc_msg_alloc(void * data, uint size){
-	struct message * msg_ = (struct message *)malloc_impl(sizeof(struct message)+size);
+	struct message * msg_ = (struct message *)malloc(sizeof(struct message)+size);
 	if(!msg_) {
 		errno = ENOMEM;
 		return NULL;
@@ -146,7 +145,7 @@ int emc_msg_free (void * msg_){
 	do{}while(0 != msg_number_cas(&((struct message *)msg_)->del, 0, 1));
 	if(!msg_check_live(msg_)) return -1;
 	((struct message *)msg_)->flag = EMC_DEAD;
-	free_impl(msg_);
+	free(msg_);
 	return 0;
 }
 

@@ -37,7 +37,6 @@
 #include "util/sendqueue.h"
 #include "util/map.h"
 #include "util/utility.h"
-#include "util/memory/jemalloc.h"
 #include "global.h"
 
 #define GLOBAL_DEVICE_DEFAULT	4096
@@ -241,13 +240,13 @@ int global_pop_sendqueue(int id, void ** p){
 }
 
 int global_add_reconnect(int id, on_reconnect_cb * cb, void * client, void * addition){
-	struct reconnect * rc = (struct reconnect *)malloc_impl(sizeof(struct reconnect));
+	struct reconnect * rc = (struct reconnect *)malloc(sizeof(struct reconnect));
 	if(!rc)return -1;
 	rc->cb = cb;
 	rc->client = client;
 	rc->addition = addition;
 	if(map_add(self.rcmq, id, rc) < 0){
-		free_impl(rc);
+		free(rc);
 		return -1;
 	}
 	return 0;
@@ -257,19 +256,19 @@ void global_free_reconnect(int id){
 	struct reconnect * rc = NULL;
 	if(0==map_get(self.rcmq, id, (void **)&rc)){
 		if(rc){
-			free_impl(rc);
+			free(rc);
 		}
 		map_erase(self.rcmq, id);
 	}
 }
 
 void * global_alloc_monitor(){
-	return malloc_impl(sizeof(struct monitor_data));
+	return malloc(sizeof(struct monitor_data));
 }
 
 void global_free_monitor(void *data){
 	if(data){
-		free_impl(data);
+		free(data);
 	}
 }
 
