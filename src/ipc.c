@@ -181,6 +181,19 @@ static int ipc_send_register_bc(struct ipc * ipc_, struct ipc_client * client){
 	return write_ipc_data(ipc_, client, client->id, EMC_CMD_LOGIN,NULL, 0 );
 }
 
+// delete all recv task unit
+static uint ipc_tq_foreach_cb(struct map * m, int64 key, void * p, void * addition){
+	union data_serial serial = {0};
+	serial.no = key;
+	if(serial.id == ((struct ipc_client *)addition)->id){
+		global_free_merger(p);
+		if(0 == map_erase(m, key)){
+			return 1;
+		}
+	}
+	return 0;
+}
+
 // Throws monitoring messages
 static void ipc_post_monitor(struct ipc * ipc_, struct ipc_client * client, int port, int evt, void * msg){
 	// If you set the monitor option throws up message
@@ -286,6 +299,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 		if(EMC_LOCAL == ipc_->type){
 			if(0 == map_get(ipc_->server->connection,id, (void **)&client)){
 				client->connected = 0;
+				map_foreach(ipc_->rmap, ipc_tq_foreach_cb, client);
 				// If you set the monitor to throw on disconnect events
 				ipc_post_monitor(ipc_, client, (int)client->evt, EMC_EVENT_CLOSED, NULL);
 #if defined (EMC_WINDOWS)
@@ -305,6 +319,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 			}
 		}else if(EMC_REMOTE == ipc_->type){
 			ipc_->client->connected = 0;
+			map_foreach(ipc_->rmap, ipc_tq_foreach_cb, ipc_->client);
 		}
 	}else if(EMC_CMD_DATA == cmd){
 		msg=emc_msg_alloc(data, len);
@@ -336,8 +351,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 
 // ipc data consolidation callback
 static void ipc_merger_cb(char * data, int len, int id, void * addition){
-	struct ipc * ipc_ = (struct ipc *)addition;
-	ipc_complete_data(ipc_, id, EMC_CMD_DATA, data, len);
+	ipc_complete_data((struct ipc *)addition, id, EMC_CMD_DATA, data, len);
 }
 
 static uint ipc_term_foreach_cb(struct map * m, int64 key, void * p, void * addition){
@@ -531,22 +545,23 @@ static int process_ipc_data(struct ipc * ipc_, char * data){
 	}else{
 		void * mg = NULL;
 		union data_serial serial = {0};
-
 		serial.id = ((struct data_unit *)data)->id;
 		serial.serial = ((struct data_unit *)data)->serial;
+
 		if(map_get(ipc_->rmap, serial.no, (void **)&mg) < 0){
+			int packets = ((struct data_unit *)data)->total/EMC_DATA_SIZE;
+			if(((struct data_unit *)data)->total % EMC_DATA_SIZE){
+				packets ++;
+			}
 			mg = global_alloc_merger();
 			if(!mg) return -1;
-			merger_init(mg, ((struct data_unit *)data)->total);
+			merger_init(mg, ((struct data_unit *)data)->total, packets);
 			map_add(ipc_->rmap, serial.no, mg);
 		}
 		if(mg){
-			merger_add(mg, ((struct data_unit *)data)->no*(MAX_DATA_SIZE-sizeof(struct data_unit)), data+sizeof(struct data_unit),
-				((struct data_unit *)data)->len);
+			merger_add(mg, ((struct data_unit *)data)->no, ((struct data_unit *)data)->no * EMC_DATA_SIZE, 
+				data+sizeof(struct data_unit), ((struct data_unit *)data)->len);
 			if(0 == merger_get(mg, ipc_merger_cb, ((struct data_unit *)data)->id, ipc_)){
-				union data_serial serial = {0};
-				serial.id = ((struct data_unit *)data)->id;
-				serial.serial = ((struct data_unit *)data)->serial;
 				global_free_merger(mg);
 				map_erase(ipc_->rmap, serial.no);
 			}
@@ -627,11 +642,11 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 		((struct data_unit *)buffer)->id = id;
 		((struct data_unit *)buffer)->serial = global_get_data_serial();
 		((struct data_unit *)buffer)->total = length;
-		package = length/(MAX_DATA_SIZE-sizeof(struct data_unit));
-		package += length%(MAX_DATA_SIZE-sizeof(struct data_unit))?1:0;
+		package = length / EMC_DATA_SIZE;
+		package += (length % EMC_DATA_SIZE)?1:0;
 		for(index=0; index<package; index++){
 			((struct data_unit *)buffer)->no = index;
-			((struct data_unit *)buffer)->len = length>(MAX_DATA_SIZE-sizeof(struct data_unit))?(MAX_DATA_SIZE-sizeof(struct data_unit)):length;
+			((struct data_unit *)buffer)->len = (length > EMC_DATA_SIZE)?EMC_DATA_SIZE:length;
 			memcpy(buffer+sizeof(struct data_unit), data, ((struct data_unit *)buffer)->len);
 			while(client->connected){
 				if(EMC_LOCAL == ipc_->type){

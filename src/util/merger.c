@@ -38,9 +38,11 @@
 #pragma pack(1)
 struct merger_unit{
 	// Data pointer
-	char				*buffer;
+	char			  * data;
 	// Total length
 	int					total;
+	// Packets
+	int					packets;
 	// Length has been received
 	int					len;
 	// The last time the data is received
@@ -58,12 +60,12 @@ struct merger{
 };
 #pragma pack()
 
-struct merger *merger_new(unsigned int count){
+struct merger * merger_new(unsigned int count){
 	struct merger * un = (struct merger *)malloc(sizeof(struct merger));
 	int index = 0;
 	
 	if(!un) return NULL;
-	if(!count)count = MERGER_DEFAULT_COUNT;
+	if(!count) count = MERGER_DEFAULT_COUNT;
 	memset(un, 0, sizeof(struct merger));
 	un->count = count;
 	emc_queue_init(&un->idle);
@@ -81,7 +83,7 @@ void merger_delete(struct merger * un){
 	free(un);
 }
 
-void* merger_alloc(struct merger * un){
+void * merger_alloc(struct merger * un){
 	struct emc_queue * head = NULL;
 	struct merger_unit * unit = NULL;
 	emc_lock(&un->lock);
@@ -96,29 +98,35 @@ void* merger_alloc(struct merger * un){
 	return unit;
 }
 
-void merger_init(void * block, int len){
+void merger_init(void * block, int len, int packets){
 	struct merger_unit * unit = (struct merger_unit *)block;
-	if(unit->buffer){
-		if(unit->total < len){
-			free_impl(unit->buffer);
-			unit->buffer = NULL;
+	if(unit->data){
+		if(unit->total < len || unit->packets < packets){
+			free_impl(unit->data);
+			unit->data = NULL;
 			unit->total = 0;
 			unit->len = 0;
+		} else {
+			memset(unit->data, 0, unit->packets * sizeof(int) + unit->total);
 		}
 	}
-	if(!unit->buffer){
-		unit->buffer = (char *)malloc_impl(len);
-		memset(unit->buffer, 0, len);
-		unit->total = len;
+	if(!unit->data){
+		unit->data = (char *)malloc_impl(packets * sizeof(int) + len);
+		memset(unit->data, 0, packets * sizeof(int) + len);
 	}
+	unit->packets = packets;
+	unit->total = len;
 	unit->time = timeGetTime();
 }
 
-int merger_add(void * block, int start, char * data, int len){
+int merger_add(void * block, int no, int start, char * data, int len){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	
-	memcpy(unit->buffer+start, data, len);
-	unit->len += len;
+	memcpy(unit->data+(unit->packets * sizeof(int))+start, data, len);
+	if(!*(int *)(unit->data + (no*sizeof(int)))){
+		unit->len += len;
+		*(int *)(unit->data + (no*sizeof(int))) = 1;
+	}
 	unit->time = timeGetTime();
 	return len;
 }
@@ -126,13 +134,14 @@ int merger_add(void * block, int start, char * data, int len){
 int merger_get(void * block, merger_get_cb * cb, int id, void * addition){
 	struct merger_unit * unit = (struct merger_unit *)block;
 
-	if(unit->buffer && unit->total==unit->len){
+	if(unit->data && unit->total == unit->len){
 		if(cb){
-			cb(unit->buffer, unit->total, id, addition);
+			cb(unit->data, unit->total, id, addition);
 		}
-		free_impl(unit->buffer);
-		unit->buffer = NULL;
+		free_impl(unit->data);
+		unit->data = NULL;
 		unit->total = 0;
+		unit->packets = 0;
 		unit->len = 0;
 		return 0;
 	}
@@ -146,10 +155,11 @@ uint merger_time(void * block){
 void merger_free(struct merger * un, void * block){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	emc_lock(&un->lock);
-	if(unit->buffer){
-		free_impl(unit->buffer);
-		unit->buffer = NULL;
+	if(unit->data){
+		free_impl(unit->data);
+		unit->data = NULL;
 		unit->total = 0;
+		unit->packets = 0;
 		unit->len = 0;
 	}
 	emc_queue_init(&unit->queue);

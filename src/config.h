@@ -139,6 +139,8 @@
 #define MAX_DATA_SIZE	8192
 // Protocol packet size
 #define MAX_PROTOCOL_SIZE	8196
+//Data length
+#define EMC_DATA_SIZE	8172
 // Header logo
 #define EMC_HEAD		0x5876
 

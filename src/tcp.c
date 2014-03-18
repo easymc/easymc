@@ -47,8 +47,6 @@
 #include "tcp.h"
 
 #define TCP_TIMEOUT		100
-//Data length
-#define TCP_DATA_SIZE	8172
 
 #if !defined (EMC_WINDOWS)
 #define TCP_FD_SIZE		64
@@ -417,8 +415,14 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 				}
 			}
 			if(mg){
-				merger_init(mg, ((struct data_unit *)data)->total);
-				merger_add(mg, ((struct data_unit *)data)->no * TCP_DATA_SIZE, data+sizeof(struct data_unit), len-sizeof(struct data_unit));
+				int packets = ((struct data_unit *)data)->total/EMC_DATA_SIZE;
+				if(((struct data_unit *)data)->total % EMC_DATA_SIZE){
+					packets ++;
+				}
+				merger_init(mg, ((struct data_unit *)data)->total, packets);
+				merger_add(mg, ((struct data_unit *)data)->no, 
+					((struct data_unit *)data)->no * EMC_DATA_SIZE, data+sizeof(struct data_unit), 
+					len-sizeof(struct data_unit));
 				if(0==merger_get(mg, tcp_merger_cb, id, tcp_)){
 					global_free_merger(mg);
 					map_erase(tcp_->rmap, serial.no);
@@ -459,6 +463,19 @@ static int tcp_reconnect_cb(void * p, void * addition){
 	return -1;
 }
 
+// delete all recv task unit
+static uint tcp_tq_foreach_cb(struct map * m, int64 key, void * p, void * addition){
+	union data_serial serial = {0};
+	serial.no = key;
+	if(serial.id == ((struct tcp_client *)addition)->id){
+		global_free_merger(p);
+		if(0 == map_erase(m, key)){
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	struct tcp_client * client = NULL;
 	void * msg = NULL;
@@ -491,6 +508,7 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 			emc_msg_free(msg);
 		}
 	}
+	map_foreach(tcp_->rmap, tcp_tq_foreach_cb, client);
 	area->count --;
 	if(EMC_LOCAL == tcp_->type){
 		tcp_post_monitor(tcp_, client, EMC_EVENT_CLOSED, NULL);
@@ -587,16 +605,16 @@ static uint tcp_pub_foreach_cb(struct hashmap * m, int key, void * p, void * add
 // Subcontracting send data
 static int tcp_data_sep(struct tcp_data * data, char * buffer, int id){
 	*(ushort *)buffer = EMC_HEAD;
-	*(ushort *)(buffer+sizeof(ushort)) = data->lave>TCP_DATA_SIZE?MAX_DATA_SIZE:(data->lave+sizeof(struct data_unit));
+	*(ushort *)(buffer+sizeof(ushort)) = data->lave>EMC_DATA_SIZE?MAX_DATA_SIZE:(data->lave+sizeof(struct data_unit));
 	((struct data_unit *)(buffer+sizeof(uint)))->cmd = data->cmd;
 	((struct data_unit *)(buffer+sizeof(uint)))->id = id;
 	((struct data_unit *)(buffer+sizeof(uint)))->serial = data->serial;
 	((struct data_unit *)(buffer+sizeof(uint)))->total = data->len;
-	((struct data_unit *)(buffer+sizeof(uint)))->len = data->lave>TCP_DATA_SIZE?TCP_DATA_SIZE:data->lave;
-	((struct data_unit *)(buffer+sizeof(uint)))->no = (data->len-data->lave)/TCP_DATA_SIZE;
+	((struct data_unit *)(buffer+sizeof(uint)))->len = data->lave>EMC_DATA_SIZE?EMC_DATA_SIZE:data->lave;
+	((struct data_unit *)(buffer+sizeof(uint)))->no = (data->len-data->lave)/EMC_DATA_SIZE;
 	memcpy(buffer+sizeof(uint)+sizeof(struct data_unit), (char *)emc_msg_buffer(data->msg)+(data->len-data->lave),
-		data->lave>TCP_DATA_SIZE?TCP_DATA_SIZE:data->lave);
-	return data->lave>TCP_DATA_SIZE?MAX_PROTOCOL_SIZE:(data->lave+sizeof(struct data_unit)+sizeof(uint));
+		data->lave>EMC_DATA_SIZE?EMC_DATA_SIZE:data->lave);
+	return data->lave>EMC_DATA_SIZE?MAX_PROTOCOL_SIZE:(data->lave+sizeof(struct data_unit)+sizeof(uint));
 }
 
 static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
