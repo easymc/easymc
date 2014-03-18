@@ -26,24 +26,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __SOCK_HASH_H_INCLUDED__
-#define __SOCK_HASH_H_INCLUDED__
+#ifndef __EMC_IDQUEUE_H_INCLUDED__
+#define __EMC_IDQUEUE_H_INCLUDED__
 
-/*****************************************************
-		Mapping socket and custom id's
-*****************************************************/
-	
-struct sockhash;
+/*******************************************************
+*		   TCP client id queue
+*******************************************************/
+
+
 
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-struct sockhash * sockhash_new(int max);
-void sockhash_delete(struct sockhash *);
-int sockhash_search(struct sockhash * , int fd);
-int sockhash_insert(struct sockhash * , int fd, int id);
-void sockhash_erase(struct sockhash *, int fd);
+struct idqueue;
+struct idqueue * create_idqueue();
+void			 delete_idqueue(struct idqueue * ptqueue);
+int				 idqueue_push(struct idqueue * queue, int id);
+int				 idqueue_pop(struct idqueue * queue, int * id);
 
 #ifdef __cplusplus
 }

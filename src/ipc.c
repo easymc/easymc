@@ -112,9 +112,9 @@ struct ipc{
 	uint				ip;
 	ushort				port;
 	// Thread
-	emc_result_t		work;
-	emc_result_t		check;
-	emc_result_t		send;
+	emc_result_t		twork;
+	emc_result_t		tcheck;
+	emc_result_t		tsend;
 
 	volatile	uint	exit;
 	// Message received task list
@@ -820,11 +820,7 @@ static emc_cb_t EMC_CALL  ipc_work_cb(void * args){
 	while(!ipc_->exit){
 		read_ipc(ipc_);
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static emc_cb_t EMC_CALL ipc_check_cb(void * args){
@@ -840,11 +836,7 @@ static emc_cb_t EMC_CALL ipc_check_cb(void * args){
 		}
 		nsleep(100);
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static emc_cb_t EMC_CALL ipc_send_cb(void * args){
@@ -876,11 +868,7 @@ static emc_cb_t EMC_CALL ipc_send_cb(void * args){
 			free_impl(data);
 		}
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 // ipc reconnection callback
@@ -1146,9 +1134,9 @@ struct ipc * create_ipc(uint ip, ushort port, int device, int plug, unsigned sho
 	}
 	ipc_->sq = create_ringqueue(_RQ_M);
 	ipc_->rmap = create_map(EMC_SOCKETS_DEFAULT);
-	ipc_->work = emc_thread(ipc_work_cb,ipc_);
-	ipc_->check = emc_thread(ipc_check_cb,ipc_);
-	ipc_->send = emc_thread(ipc_send_cb,ipc_);
+	ipc_->twork = emc_thread(ipc_work_cb,ipc_);
+	ipc_->tcheck = emc_thread(ipc_check_cb,ipc_);
+	ipc_->tsend = emc_thread(ipc_send_cb,ipc_);
 	return ipc_;
 }
 
@@ -1157,9 +1145,9 @@ void delete_ipc(struct ipc * ipc_){
 		ipc_->exit = 1;
 		ipc_self_read_post(ipc_);
 		post_ringqueue(ipc_->sq);
-		emc_thread_join(ipc_->work);
-		emc_thread_join(ipc_->check);
-		emc_thread_join(ipc_->send);
+		emc_thread_join(ipc_->twork);
+		emc_thread_join(ipc_->tcheck);
+		emc_thread_join(ipc_->tsend);
 		if(EMC_LOCAL == ipc_->type){
 			map_foreach(ipc_->server->connection, map_foreach_logout_cb, ipc_);
 			term_ipc(ipc_);

@@ -26,94 +26,62 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pqueue.h"
+#include "idqueue.h"
 #include "../config.h"
 #include "lock.h"
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
 
-#define PQUEUE_SIZE	(1024)
-
 /* Pointer queue, do not allocate memory, only save the pointer */
 
 #pragma pack(1)
-struct pqueue
+struct idqueue
 {
 	 
-	 void	**					units;
+	 int						ids[EMC_SOCKETS_DEFAULT];
 	 unsigned int				used;
 	 unsigned int				size;
 	 volatile unsigned int		lock;                    
 };
 #pragma pack()
 
-struct pqueue * create_pqueue()
+struct idqueue * create_idqueue()
 {
-	struct pqueue * queue = (struct pqueue *)malloc(sizeof(struct pqueue));
+	struct idqueue * queue = (struct idqueue *)malloc(sizeof(struct idqueue));
 	if(!queue) return NULL;
-	memset(queue, 0, sizeof(struct pqueue));
-	queue->units = (void**)malloc(sizeof(void *) * PQUEUE_SIZE);
-	queue->size = PQUEUE_SIZE;
-	memset(queue->units, 0, sizeof(void *) * PQUEUE_SIZE);
+	memset(queue, 0, sizeof(struct idqueue));
+	queue->size = EMC_SOCKETS_DEFAULT;
+	memset(queue->ids, -1, sizeof(int) * EMC_SOCKETS_DEFAULT);
 	return queue;
 }
 
-void delete_pqueue(struct pqueue * queue){
-	if(queue){
-		free(queue->units);
-		free(queue);
-	}
+void delete_idqueue(struct idqueue * queue){
+	free(queue);
 }
 
-int pqueue_push(struct pqueue * queue, void * data){
+int idqueue_push(struct idqueue * queue, int id){
 	emc_lock(&queue->lock);
 	if(queue->used >= queue->size){
-		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
-		queue->size += PQUEUE_SIZE;
+		emc_unlock(&queue->lock);
+		return -1;
 	}
-	queue->units[queue->used] = data;
-	queue->used ++;
+	queue->ids[queue->used ++] = id;
 	emc_unlock(&queue->lock);
 	return 0;
 }
 
-int pqueue_push_head(struct pqueue * queue, void * data){
-	emc_lock(&queue->lock);
-	if(queue->used >= queue->size){
-		queue->units = (void**)realloc(queue->units,sizeof(void *) * (queue->size+PQUEUE_SIZE));
-		queue->size += PQUEUE_SIZE;
-	}
-	if(queue->used){
-		memmove(&queue->units[1], &queue->units[0], sizeof(void *) * queue->used);
-		queue->units[0] = data;
-		queue->used ++;
-	} else {
-		queue->units[queue->used++] = data;
-	}
-	emc_unlock(&queue->lock);
-	return 0;
-}
-
-int pqueue_pop(struct pqueue * queue, void ** buf){
+int idqueue_pop(struct idqueue * queue, int * id){
 	emc_lock(&queue->lock);
 	if(!queue->used){
 		emc_unlock(&queue->lock);
 		return -1;
 	}
-	*buf = queue->units[0];
+	*id = queue->ids[0];
 	queue->used --;
 	if(queue->used){
-		memmove(&queue->units[0], &queue->units[1], sizeof(void *) * queue->used);
+		memmove(&queue->ids[0], &queue->ids[1], sizeof(int) * queue->used);
 	}
 	emc_unlock(&queue->lock);
 	return 0;
-}
-
-unsigned int pqueue_size(struct pqueue * queue){
-	unsigned int size = 0;
-	emc_lock(&queue->lock);
-	size = queue->used;
-	emc_unlock(&queue->lock);
-	return size;
 }

@@ -33,7 +33,7 @@
 #include "util/hashmap.h"
 #include "util/unpack.h"
 #include "util/merger.h"
-#include "util/pqueue.h"
+#include "util/idqueue.h"
 #include "util/sendqueue.h"
 #include "util/map.h"
 #include "util/utility.h"
@@ -54,7 +54,7 @@ struct global{
 	// Record all the plug
 	struct hashmap		*plugs;
 	// Serial connection id, since the growth
-	struct pqueue		*id_allocator;
+	struct idqueue		*id_allocator;
 	// Data consolidator
 	struct merger		*mg;
 	// Depacketizer
@@ -64,7 +64,7 @@ struct global{
 	// Reconnect map
 	struct map			*rcmq;
 	// reconnect thread
-	emc_result_t		reconnect;
+	emc_result_t		treconnect;
 	// exit
 	volatile uint		exit;
 };
@@ -88,11 +88,7 @@ static emc_cb_t EMC_CALL  global_reconnect_cb(void * args){
 		map_foreach(self.rcmq, reconnect_map_foreach_cb, NULL);
 		nsleep(100);
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static uint global_number_cas(volatile uint * key, uint _old, uint _new){
@@ -113,7 +109,7 @@ static uint global_number_next(volatile uint * v){
 }
 
 static void global_init(void){
-	int64 index = 0;
+	int index = 0;
 	if(!self.devices){
 #if defined (EMC_WINDOWS)
 		WSADATA	wsaData = {0};
@@ -123,20 +119,20 @@ static void global_init(void){
 		self.plugs = hashmap_new(EMC_SOCKETS_DEFAULT);
 		self.mg = merger_new(EMC_SOCKETS_DEFAULT);
 		self.upk = unpack_new(EMC_SOCKETS_DEFAULT);
-		self.id_allocator = create_pqueue();
+		self.id_allocator = create_idqueue();
 		for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
-			pqueue_push(self.id_allocator, (void*)index);
+			idqueue_push(self.id_allocator, index);
 		}
 		self.sq = create_sendqueue();
 		self.rcmq = create_map(EMC_SOCKETS_DEFAULT);
 		srand((uint)time(NULL));
-		self.reconnect = emc_thread(global_reconnect_cb, NULL);
+		self.treconnect = emc_thread(global_reconnect_cb, NULL);
 	}
 }
 
 void global_term(void){
 	self.exit = 1;
-	emc_thread_join(self.reconnect);
+	emc_thread_join(self.treconnect);
 #if defined (EMC_WINDOWS)
 	WSACleanup();
 #endif
@@ -146,7 +142,7 @@ void global_term(void){
 	self.plugs = NULL;
 	unpack_delete(self.upk);
 	self.upk = NULL;
-	delete_pqueue(self.id_allocator);
+	delete_idqueue(self.id_allocator);
 	self.id_allocator = NULL;
 	delete_sendqueue(self.sq);
 	self.sq = NULL;
@@ -221,16 +217,15 @@ unsigned int global_get_data_serial(){
 }
 
 int global_get_connect_id(){
-	int64 serial = -1;
-	if(pqueue_pop(self.id_allocator, (void**)&serial) < 0){
+	int id = -1;
+	if(idqueue_pop(self.id_allocator, &id) < 0){
 		return -1;
 	}
-	return (int)serial;
+	return id;
 }
 
 void global_idle_connect_id(int id){
-	int64 serial = id;
-	pqueue_push(self.id_allocator, (void *)serial);
+	idqueue_push(self.id_allocator, id);
 }
 
 int global_push_sendqueue(int id, void * p){
@@ -268,7 +263,7 @@ void global_free_reconnect(int id){
 	}
 }
 
-void *global_alloc_monitor(){
+void * global_alloc_monitor(){
 	return malloc_impl(sizeof(struct monitor_data));
 }
 

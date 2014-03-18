@@ -31,14 +31,12 @@
 #include "util/map.h"
 #include "util/hashmap.h"
 #include "util/utility.h"
-#include "util/sockhash.h"
 #include "util/unpack.h"
 #include "util/sendqueue.h"
 #include "util/merger.h"
 #include "util/event.h"
 #include "util/ringqueue.h"
 #include "util/uniquequeue.h"
-#include "util/pqueue.h"
 #include "util/lock.h"
 #include "util//memory/jemalloc.h"
 #include "global.h"
@@ -63,7 +61,7 @@
 #endif
 
 #if defined (EMC_WINDOWS)
-struct tcp_overlapped{
+struct tcp_ol{
 	// Overlapping structures
 	OVERLAPPED			ol;
 	WSABUF				buf;
@@ -108,8 +106,8 @@ struct tcp_area{
 	int					fd;
 #endif
 	// Thread
-	emc_result_t		work;
-	emc_result_t		send;
+	emc_result_t		twork;
+	emc_result_t		tsend;
 	// tcp manger
 	struct tcp_mgr	*	mgr;
 };
@@ -118,7 +116,7 @@ struct tcp_server{
 	//socket handle
 	int					fd;
 	// accept thread
-	emc_result_t		accept;			
+	emc_result_t		taccept;			
 	struct tcp			*tcp_;
 	struct hashmap		*connection;
 };
@@ -135,7 +133,7 @@ struct tcp_client{
 	// Connection process is completed
 	volatile uint			completed;
 #if defined (EMC_WINDOWS)
-	struct tcp_overlapped	olr;
+	struct tcp_ol			olr;
 #endif
 	struct tcp				*tcp_;
 	struct tcp_area			*area;
@@ -156,9 +154,6 @@ struct tcp{
 	int					ip;
 	//port
 	ushort				port;
-#if !defined (EMC_WINDOWS)	
-	struct sockhash		*hash;
-#endif
 	// Message received task list
 	struct map			*rmap;
 	struct tcp_server	*server;
@@ -725,27 +720,13 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 	client->tcp_ = tcp_;
 	client->id = global_get_connect_id();
 	client->completed = 0;
-#if !defined (EMC_WINDOWS)
-	if(sockhash_insert(tcp_->hash, client->fd, client->id) < 0){
-		global_idle_connect_id(client->id);
-		free_impl(client);
-		_close_socket(fd);
-		return -1;
-	}
-#endif
 	if(tcp_add_event(area, client, EMC_READ) < 0){
-#if !defined (EMC_WINDOWS)
-		sockhash_erase(tcp_->hash, client->fd);
-#endif
 		global_idle_connect_id(client->id);
 		free_impl(client);
 		_close_socket(fd);
 		return -1;
 	}
 	if(hashmap_insert(tcp_->server->connection, client->id, client) < 0){
-#if !defined (EMC_WINDOWS)
-		sockhash_erase(tcp_->hash, client->fd);
-#endif
 		global_idle_connect_id(client->id);
 		free_impl(client);
 		_close_socket(fd);
@@ -759,15 +740,14 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 }
 
 static emc_cb_t EMC_CALL tcp_work_cb(void * args){
-	int64 sid = -1;
 #if defined (EMC_WINDOWS)
-	uint length=0, key=0;
-	struct tcp_overlapped *ol = NULL;
+	uint length = 0, key = 0;
+	struct tcp_ol *ol = NULL;
 #else
 	int retval=-1, id=-1;
 	struct epoll_event	events[TCP_FD_SIZE];
 #endif
-	struct tcp_area	*area = (struct tcp_area *)args;
+	struct tcp_area	* area = (struct tcp_area *)args;
 	struct tcp_mgr * mgr = area->mgr;
 
 	while(!mgr->exit){
@@ -808,11 +788,11 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, 1);
 		if(retval > 0){
 			int j = 0;
-			for (j=0; j<retval; j++){
+			for (j = 0; j < retval; j++){
 				id = ((struct tcp_client *)events[j].data.ptr)->id;
 				if(id >=0 && id < EMC_SOCKETS_DEFAULT){
 					if(events[j].events & EPOLLIN){
-						if(((struct tcp_client *)events[j].data.ptr)->tcp_){
+						if(events[j].data.ptr && ((struct tcp_client *)events[j].data.ptr)->tcp_){
 							process_recv(((struct tcp_client *)events[j].data.ptr)->tcp_, area, id);
 						}
 					}
@@ -821,11 +801,7 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 		}
 #endif
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static emc_cb_t EMC_CALL tcp_send_cb(void * args){
@@ -840,11 +816,7 @@ static emc_cb_t EMC_CALL tcp_send_cb(void * args){
 			process_send(tcp_, area, id);
 		}
 	}
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static emc_cb_t EMC_CALL tcp_accept_cb(void * args){
@@ -857,16 +829,9 @@ static emc_cb_t EMC_CALL tcp_accept_cb(void * args){
 		if(fd > 0){
 			area = tcp_least_thread(tcp_->mgr);
 			process_accept(tcp_, area, fd, inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
-		}else{
-			nsleep(1);
 		}
 	}
-
-#if defined (EMC_WINDOWS)
-	return 0;
-#else
-	return NULL;
-#endif
+	return (emc_cb_t)0;
 }
 
 static uint tcp_close_cb(struct hashmap * m, int id, void * p, void * addition){
@@ -903,7 +868,7 @@ static int init_tcp_server(struct tcp * tcp_){
 		return -1;
 	}
 	tcp_->server->connection = hashmap_new(EMC_SOCKETS_DEFAULT);
-	tcp_->server->accept = emc_thread(tcp_accept_cb, tcp_);
+	tcp_->server->taccept = emc_thread(tcp_accept_cb, tcp_);
 	return 0;
 }
 
@@ -1076,8 +1041,8 @@ int init_tcp_mgr(struct tcp_mgr *mgr, int thread){
 		mgr->area[index].fd  = epoll_create(EMC_SOCKETS_DEFAULT);
 #endif
 		mgr->area[index].mgr = mgr;
-		mgr->area[index].work = emc_thread(tcp_work_cb, mgr->area+index);
-		mgr->area[index].send = emc_thread(tcp_send_cb, mgr->area+index);
+		mgr->area[index].twork = emc_thread(tcp_work_cb, mgr->area+index);
+		mgr->area[index].tsend = emc_thread(tcp_send_cb, mgr->area+index);
 	}
 	return 0;
 }
@@ -1110,17 +1075,11 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 	tcp_->mgr = mgr;
 	tcp_->plug = plug;
 	tcp_->flag = EMC_LIVE;
-#if !defined (EMC_WINDOWS)
-	tcp_->hash = sockhash_new(EMC_SOCKETS_DEFAULT);
-#endif
 	tcp_->rmap = create_map(EMC_SOCKETS_DEFAULT);
 	if(EMC_LOCAL == type){
 		tcp_->server = (struct tcp_server *)malloc(sizeof(struct tcp_server));
 		if(!tcp_->server){
 			delete_map(tcp_->rmap);
-#if !defined (EMC_WINDOWS)
-			sockhash_delete(tcp_->hash);
-#endif
 			tcp_->flag = EMC_DEAD;
 			free(tcp_);
 			errno = ENOMEM;
@@ -1129,9 +1088,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 		memset(tcp_->server, 0, sizeof(struct tcp_server));
 		if(init_tcp_server(tcp_) < 0){
 			delete_map(tcp_->rmap);
-#if !defined (EMC_WINDOWS)
-			sockhash_delete(tcp_->hash);
-#endif
 			tcp_->flag = EMC_DEAD;
 			free(tcp_);
 			return NULL;
@@ -1140,9 +1096,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 		tcp_->client = (struct tcp_client *)malloc(sizeof(struct tcp_client));
 		if(!tcp_->client){
 			delete_map(tcp_->rmap);
-#if !defined (EMC_WINDOWS)
-			sockhash_delete(tcp_->hash);
-#endif
 			tcp_->flag = EMC_DEAD;
 			free(tcp_);
 			return NULL;
@@ -1157,9 +1110,6 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 				global_idle_connect_id(tcp_->client->id);
 				free(tcp_->client);
 				delete_map(tcp_->rmap);
-#if !defined (EMC_WINDOWS)
-				sockhash_delete(tcp_->hash);
-#endif
 				tcp_->flag = EMC_DEAD;
 				free(tcp_);
 				return NULL;
@@ -1181,8 +1131,8 @@ void delete_tcp_mgr(struct tcp_mgr * mgr){
 #else
 		close(mgr->area[index].fd);
 #endif
-		emc_thread_join(mgr->area[index].work);
-		emc_thread_join(mgr->area[index].send);
+		emc_thread_join(mgr->area[index].twork);
+		emc_thread_join(mgr->area[index].tsend);
 		post_uqueue(mgr->area[index].wmq);
 		delete_uqueue(mgr->area[index].wmq);
 		mgr->area[index].wmq = NULL;
@@ -1196,7 +1146,7 @@ void delete_tcp(struct tcp * tcp_){
 		tcp_->exit = 1;
 		if(EMC_LOCAL == tcp_->type){
 			_close_socket(tcp_->server->fd);
-			emc_thread_join(tcp_->server->accept);
+			emc_thread_join(tcp_->server->taccept);
 			hashmap_foreach(tcp_->server->connection, tcp_close_cb, NULL);
 			hashmap_delete(tcp_->server->connection);
 			free(tcp_->server);
@@ -1208,10 +1158,6 @@ void delete_tcp(struct tcp * tcp_){
 		}
 		delete_map(tcp_->rmap);
 		tcp_->rmap = NULL;
-#if !defined (EMC_WINDOWS)
-		sockhash_delete(tcp_->hash);
-		tcp_->hash = NULL;
-#endif
 		free(tcp_);
 	}
 }
