@@ -26,8 +26,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __EMC_IDQUEUE_H_INCLUDED__
-#define __EMC_IDQUEUE_H_INCLUDED__
+#ifndef __EMC_NQUEUE_H_INCLUDED__
+#define __EMC_NQUEUE_H_INCLUDED__
 
 /*******************************************************
 *		   TCP client id queue
@@ -39,11 +39,11 @@
 extern "C"{
 #endif
 
-struct idqueue;
-struct idqueue * create_idqueue();
-void			 delete_idqueue(struct idqueue * ptqueue);
-int				 idqueue_push(struct idqueue * queue, int id);
-int				 idqueue_pop(struct idqueue * queue, int * id);
+struct nqueue;
+struct nqueue * create_nqueue();
+void			 delete_nqueue(struct nqueue * ptqueue);
+int				 nqueue_push(struct nqueue * queue, int id);
+int				 nqueue_pop(struct nqueue * queue, int * id);
 
 #ifdef __cplusplus
 }

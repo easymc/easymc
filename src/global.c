@@ -33,7 +33,7 @@
 #include "util/hashmap.h"
 #include "util/unpack.h"
 #include "util/merger.h"
-#include "util/idqueue.h"
+#include "util/nqueue.h"
 #include "util/sendqueue.h"
 #include "util/map.h"
 #include "util/utility.h"
@@ -54,7 +54,7 @@ struct global{
 	// Record all the plug
 	struct hashmap		*plugs;
 	// Serial connection id, since the growth
-	struct idqueue		*id_allocator;
+	struct nqueue		*id_allocator;
 	// Data consolidator
 	struct merger		*mg;
 	// Depacketizer
@@ -119,9 +119,9 @@ static void global_init(void){
 		self.plugs = hashmap_new(EMC_SOCKETS_DEFAULT);
 		self.mg = merger_new(EMC_SOCKETS_DEFAULT);
 		self.upk = unpack_new(EMC_SOCKETS_DEFAULT);
-		self.id_allocator = create_idqueue();
+		self.id_allocator = create_nqueue();
 		for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
-			idqueue_push(self.id_allocator, index);
+			nqueue_push(self.id_allocator, index);
 		}
 		self.sq = create_sendqueue();
 		self.rcmq = create_map(EMC_SOCKETS_DEFAULT);
@@ -142,7 +142,7 @@ void global_term(void){
 	self.plugs = NULL;
 	unpack_delete(self.upk);
 	self.upk = NULL;
-	delete_idqueue(self.id_allocator);
+	delete_nqueue(self.id_allocator);
 	self.id_allocator = NULL;
 	delete_sendqueue(self.sq);
 	self.sq = NULL;
@@ -218,14 +218,14 @@ unsigned int global_get_data_serial(){
 
 int global_get_connect_id(){
 	int id = -1;
-	if(idqueue_pop(self.id_allocator, &id) < 0){
+	if(nqueue_pop(self.id_allocator, &id) < 0){
 		return -1;
 	}
 	return id;
 }
 
 void global_idle_connect_id(int id){
-	idqueue_push(self.id_allocator, id);
+	nqueue_push(self.id_allocator, id);
 }
 
 int global_push_sendqueue(int id, void * p){

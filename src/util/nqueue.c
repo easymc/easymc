@@ -26,7 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "idqueue.h"
+#include "nqueue.h"
 #include "../config.h"
 #include "lock.h"
 #include <stdio.h>
@@ -36,7 +36,7 @@
 /* Pointer queue, do not allocate memory, only save the pointer */
 
 #pragma pack(1)
-struct idqueue
+struct nqueue
 {
 	 
 	 int						ids[EMC_SOCKETS_DEFAULT];
@@ -46,21 +46,21 @@ struct idqueue
 };
 #pragma pack()
 
-struct idqueue * create_idqueue()
+struct nqueue * create_nqueue()
 {
-	struct idqueue * queue = (struct idqueue *)malloc(sizeof(struct idqueue));
+	struct nqueue * queue = (struct nqueue *)malloc(sizeof(struct nqueue));
 	if(!queue) return NULL;
-	memset(queue, 0, sizeof(struct idqueue));
+	memset(queue, 0, sizeof(struct nqueue));
 	queue->size = EMC_SOCKETS_DEFAULT;
 	memset(queue->ids, -1, sizeof(int) * EMC_SOCKETS_DEFAULT);
 	return queue;
 }
 
-void delete_idqueue(struct idqueue * queue){
+void delete_nqueue(struct nqueue * queue){
 	free(queue);
 }
 
-int idqueue_push(struct idqueue * queue, int id){
+int nqueue_push(struct nqueue * queue, int id){
 	emc_lock(&queue->lock);
 	if(queue->used >= queue->size){
 		emc_unlock(&queue->lock);
@@ -71,7 +71,7 @@ int idqueue_push(struct idqueue * queue, int id){
 	return 0;
 }
 
-int idqueue_pop(struct idqueue * queue, int * id){
+int nqueue_pop(struct nqueue * queue, int * id){
 	emc_lock(&queue->lock);
 	if(!queue->used){
 		emc_unlock(&queue->lock);
