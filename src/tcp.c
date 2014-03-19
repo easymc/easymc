@@ -700,7 +700,7 @@ static int process_accept(struct tcp * tcp_, struct tcp_area * area, int fd, cha
 	int flag=1, size=0x10000;
 	struct tcp_client * client = NULL;
 
-	if(0!=_nonblocking(fd, flag)){
+	if(_nonblocking(fd, flag) < 0){
 		_close_socket(fd);
 		return -1;
 	}
@@ -862,7 +862,7 @@ static int init_tcp_server(struct tcp * tcp_){
 		errno = ENOSOCK;
 		return -1;
 	}
-	if(0!=setsockopt(tcp_->server->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag))){
+	if(setsockopt(tcp_->server->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag)) < 0){
 		_close_socket(tcp_->server->fd);
 		errno = EINVAL;
 		return -1;
@@ -890,7 +890,7 @@ static void tcp_send_login(struct tcp * tcp_){
 	void * msg = emc_msg_alloc(NULL, sizeof(ushort));
 	emc_msg_setid(msg, tcp_->client->id);
 	*(ushort *)emc_msg_buffer(msg) = tcp_->client->mode;
-	if(tcp_send_data(tcp_,tcp_->client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
+	if(tcp_send_data(tcp_, tcp_->client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
 		emc_msg_free(msg);
 	}
 }
@@ -917,7 +917,7 @@ static int init_tcp_client(struct tcp * tcp_){
 		errno = ENOSOCK;
 		return -1;
 	}
-	if(0 != _nonblocking(tcp_->client->fd, flag)){
+	if(_nonblocking(tcp_->client->fd, flag) < 0){
 		_close_socket(tcp_->client->fd);
 		errno = EINVAL;
 		return -1;
