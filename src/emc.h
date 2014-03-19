@@ -161,7 +161,7 @@ struct monitor_data{
 
 // easymc device operating parameters
 #define EMC_OPT_MONITOR			1	// Set the device to monitor events
-#define EMC_OPT_CONTROL			2	// Settings are available to control device
+#define EMC_OPT_CONTROL			2	// Settings are available to control plug
 #define EMC_OPT_THREAD			4	// Set the device thread number,valid only for tcp
 
 // easymc events type
@@ -172,7 +172,7 @@ struct monitor_data{
 #define EMC_EVENT_SNDSUCC		16	// Send data successful
 
 // easymc control type
-#define EMC_CTL_CLOSE			1	// Initiative to close the connection,by bind the device to be effective
+#define EMC_CTL_CLOSE			1	// Initiative to close the connection,by bind the plug to be effective
 
 
 // emc send message flag
@@ -236,7 +236,7 @@ EMC_EXP int EMC_BIND emc_set(int device, int opt, void * optval, int optlen);
 EMC_EXP int EMC_BIND emc_plug(int device);
 EMC_EXP int EMC_BIND emc_bind(int plug, const char * ip, const ushort port);
 EMC_EXP int EMC_BIND emc_connect(int plug, ushort mode, const char * ip, const ushort port);
-// Control device,id is connected via monitor returns number.
+// Control plug,id is connected via monitor returns number.
 EMC_EXP int EMC_BIND emc_control(int plug, int id, int ctl);
 EMC_EXP int EMC_BIND emc_close(int plug);
 // After processing is complete message needs to call emc_msg_free() to release.
