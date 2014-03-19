@@ -55,7 +55,7 @@ static void put_ordered_char(volatile char * buffer, uint offset, char flag){
 }
 
 static int get_int_volatitle(volatile int * buffer, uint offset){
-	volatile int * addr = buffer+offset;
+	volatile int * addr = buffer + offset;
 	int result = *addr;
 	emc_mb();
 	return result;
@@ -70,19 +70,19 @@ static uint ringarray_number_cas(volatile int * key, uint _old, uint _new){
 }
 
 static uint ringarray_write_next(struct ringarray * rb){
-	uint current=0, next=0;
+	uint current = 0, next = 0;
 	do{
 		current = get_int_volatitle(&rb->pd, 0);
-		next = current+1;
+		next = current + 1;
 	}while(current != ringarray_number_cas(&rb->pd, current, next));
 	return next;
 }
 
 static int ringarray_read_next(struct ringarray * rb, int * cursor){
-	int current=0, next=0;
+	int current = 0, next = 0;
 	do{
 		current = get_int_volatitle(&rb->cs, 0);
-		next = current+1;
+		next = current + 1;
 		if(next > get_int_volatitle(&rb->cursor, 0)){
 			return -1;
 		}
@@ -92,7 +92,7 @@ static int ringarray_read_next(struct ringarray * rb, int * cursor){
 }
 
 static uint ringarray_check_consumer(struct ringarray * rb){
-	if(get_int_volatitle(&rb->pd,0)-get_int_volatitle(&rb->real,0)+1 >= _RA_SIZE){
+	if(get_int_volatitle(&rb->pd, 0)-get_int_volatitle(&rb->real, 0) + 1 >= _RA_SIZE){
 		return 1;
 	}
 	return 0;
@@ -107,7 +107,7 @@ void init_ringarray(struct ringarray * rb){
 }
 
 int push_ringarray(struct ringarray * rb, int v){
-	uint current=0, cursor=0, index=0;
+	uint current = 0, cursor = 0, index = 0;
 
 	if(ringarray_check_consumer(rb) > 0) return -1;
 	cursor = ringarray_write_next(rb);
@@ -128,14 +128,14 @@ int pop_ringarray(struct ringarray * rb, void * buf){
 	uint current = 0;
 	int	cursor = 0;
 
-	if(get_int_volatitle(&rb->cursor,0)-get_int_volatitle(&rb->cs,0) <= 0){
+	if(get_int_volatitle(&rb->cursor, 0)-get_int_volatitle(&rb->cs, 0) <= 0){
 		return -1;
 	}
-	if(ringarray_read_next(rb,&cursor) < 0){
+	if(ringarray_read_next(rb, &cursor) < 0){
 		return -1;
 	}
 	if(buf){
-		*(int *)buf = rb->node[cursor&_RA_MASK];
+		*(int *)buf = rb->node[cursor & _RA_MASK];
 	}
 	//commit
 	do{

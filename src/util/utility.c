@@ -75,7 +75,7 @@ unsigned int check_local_machine(int ip){
 	if(!ent){
 		return 0;
 	}
-	for(index=0; ent->h_addr_list[index]; index++){
+	for(index = 0; ent->h_addr_list[index]; index ++){
 		if(ip == ((struct sockaddr_in *)ent->h_addr_list[index])->sin_addr.s_addr){
 			return 1;
 		}
@@ -88,9 +88,9 @@ uint get_cpu_num(){
 #if defined (EMC_WINDOWS)
 	SYSTEM_INFO sysInfo = {0};
 	GetSystemInfo(&sysInfo);
-	return sysInfo.dwNumberOfProcessors/2;
+	return sysInfo.dwNumberOfProcessors / 2;
 #else
-	return 2*sysconf(_SC_NPROCESSORS_ONLN);
+	return sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 }
 
@@ -104,14 +104,14 @@ void micro_wait(int64 microseconds){
 
 	if(!QueryPerformanceFrequency(&freq))
 		return;
-	timeout = freq.QuadPart*microseconds/1000/1000; 
+	timeout = freq.QuadPart*microseconds / 1000 / 1000; 
 	QueryPerformanceCounter(&timestart); 
 	timestop = timestart; 
-	while(timestop.QuadPart-timestart.QuadPart < timeout){ 
+	while(timestop.QuadPart - timestart.QuadPart < timeout){ 
 		QueryPerformanceCounter(&timestop); 
 	}
 #else
-	struct timespec ts = {0,microseconds * 1000};
+	struct timespec ts = {0, microseconds * 1000};
 	nanosleep(&ts, NULL);
 #endif
 }

@@ -70,7 +70,7 @@ struct merger * merger_new(unsigned int count){
 	emc_queue_init(&un->idle);
 	un->units = (struct merger_unit *)malloc(sizeof(struct merger_unit) * count);
 	memset(un->units, 0, sizeof(struct merger_unit) * count);
-	for(index=0; index<count; index++){
+	for(index = 0; index < count; index ++){
 		emc_queue_init(&un->units[index].queue);
 		emc_queue_insert_tail(&un->idle, &un->units[index].queue);
 	}
@@ -121,7 +121,7 @@ void merger_init(void * block, int len, int packets){
 int merger_add(void * block, int no, int start, char * data, int len){
 	struct merger_unit * unit = (struct merger_unit *)block;
 	
-	memcpy(unit->data+(unit->packets * sizeof(int))+start, data, len);
+	memcpy(unit->data+(unit->packets * sizeof(int)) + start, data, len);
 	if(!*(int *)(unit->data + (no * sizeof(int)))){
 		unit->len += len;
 		*(int *)(unit->data + (no * sizeof(int))) = 1;

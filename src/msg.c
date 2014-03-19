@@ -151,22 +151,22 @@ int emc_msg_free (void * msg_){
 
 void *emc_msg_buffer(void * msg_){
 	if(!msg_ || (msg_ && !msg_check_live(msg_))) return NULL;
-	return (struct message *)msg_+1;
+	return (struct message *)msg_ + 1;
 }
 
 int emc_msg_zero_ref(void * msg){
 	if(msg && msg_check_live(msg)){
-		return 0==((struct message *)msg)->ref?1:0;
+		return 0 == ((struct message *)msg)->ref?1:0;
 	}
 	return -1;
 }
 
 int emc_msg_ref_add(void * msg){
-	uint current=0, next=0;
+	uint current = 0, next = 0;
 	if(msg_check_live(msg)){
 		do{
 			current = ((struct message *)msg)->ref;
-			next = current+1;
+			next = current + 1;
 		}while(current != msg_number_cas(&((struct message *)msg)->ref, current, next));
 		return 0;
 	}
@@ -174,11 +174,11 @@ int emc_msg_ref_add(void * msg){
 }
 
 int emc_msg_ref_dec(void * msg){
-	uint current=0, next=0;
+	uint current = 0, next = 0;
 	if(msg_check_live(msg)){
 		do{
 			current = ((struct message *)msg)->ref;
-			next = current-1;
+			next = current - 1;
 		}while(current != msg_number_cas(&((struct message *)msg)->ref, current, next));
 		return 0;
 	}

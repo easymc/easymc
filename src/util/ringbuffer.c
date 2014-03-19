@@ -50,7 +50,7 @@ static void put_ordered_char(volatile char * buffer, uint offset, char flag){
 }
 
 static int get_int_volatitle(volatile int * buffer, uint offset){
-	volatile int * addr = buffer+offset;
+	volatile int * addr = buffer + offset;
 	int result = *addr;
 	emc_mb();
 	return result;
@@ -65,19 +65,19 @@ static uint ringbuffer_number_cas(volatile int * key, uint _old, uint _new){
 }
 
 static uint ringbuffer_write_next(struct ringbuffer * rb){
-	uint current=0, next=0;
+	uint current = 0, next = 0;
 	do{
 		current = get_int_volatitle(&rb->pd, 0);
-		next = current+1;
+		next = current + 1;
 	}while(current != ringbuffer_number_cas(&rb->pd, current, next));
 	return next;
 }
 
 static int ringbuffer_read_next(struct ringbuffer * rb, int * cursor){
-	int current=0, next=0;
+	int current = 0, next = 0;
 	do{
 		current = get_int_volatitle(&rb->cs, 0);
-		next = current+1;
+		next = current + 1;
 		if(next > get_int_volatitle(&rb->cursor, 0)){
 			return -1;
 		}
@@ -87,7 +87,7 @@ static int ringbuffer_read_next(struct ringbuffer * rb, int * cursor){
 }
 
 static uint ringbuffer_check_consumer(struct ringbuffer * rb){
-	if(get_int_volatitle(&rb->pd, 0)-get_int_volatitle(&rb->real, 0)+1 >= _RB_SIZE){
+	if(get_int_volatitle(&rb->pd, 0) - get_int_volatitle(&rb->real, 0) + 1 >= _RB_SIZE){
 		return 1;
 	}
 	return 0;
@@ -101,15 +101,15 @@ void init_ringbuffer(struct ringbuffer * rb){
 }
 
 int push_ringbuffer(struct ringbuffer * rb, void * data, uint len){
-	uint current=0, cursor=0, index=0;
+	uint current = 0, cursor = 0, index = 0;
 
-	if(len>MAX_DATA_SIZE || ringbuffer_check_consumer(rb) > 0) return -1;
+	if(len > MAX_DATA_SIZE || ringbuffer_check_consumer(rb) > 0) return -1;
 	cursor = ringbuffer_write_next(rb);
-	memcpy((char *)rb+sizeof(struct ringbuffer)+MAX_DATA_SIZE * (cursor&_RB_MASK), data, len);
+	memcpy((char *)rb + sizeof(struct ringbuffer) + MAX_DATA_SIZE * (cursor & _RB_MASK), data, len);
 	//commit
 	do{
 		current = get_int_volatitle(&rb->cursor, 0);
-		if(current+1 == cursor){
+		if(current + 1 == cursor){
 			if(current == ringbuffer_number_cas(&rb->cursor, current, cursor)){
 				break;
 			}
@@ -122,19 +122,19 @@ int pop_ringbuffer(struct ringbuffer * rb, void * buffer){
 	uint current = 0;
 	int cursor = 0;
 
-	if(get_int_volatitle(&rb->cursor,0)-get_int_volatitle(&rb->cs,0) <= 0){
+	if(get_int_volatitle(&rb->cursor, 0) - get_int_volatitle(&rb->cs, 0) <= 0){
 		return -1;
 	}
 	if(ringbuffer_read_next(rb, &cursor) < 0){
 		return -1;
 	}
 	if(buffer){
-		memcpy(buffer, (char *)rb+sizeof(struct ringbuffer)+(cursor&_RB_MASK) * MAX_DATA_SIZE, MAX_DATA_SIZE);
+		memcpy(buffer, (char *)rb + sizeof(struct ringbuffer) + (cursor & _RB_MASK) * MAX_DATA_SIZE, MAX_DATA_SIZE);
 	}
 	//commit
 	do{
 		current = get_int_volatitle(&rb->real, 0);
-		if(current+1 == cursor){
+		if(current + 1 == cursor){
 			if(current == ringbuffer_number_cas(&rb->real, current, cursor)){
 				break;
 			}

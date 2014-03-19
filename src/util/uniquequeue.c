@@ -91,7 +91,7 @@ int pop_uqueue(struct uniquequeue * uq, void ** p){
 		*p = uq->queue[0].addition;
 	}
 	if(uq->used > 1){
-		memmove(uq->queue, uq->queue+1, sizeof(struct uniquenode) * (uq->used-1));
+		memmove(uq->queue, uq->queue + 1, sizeof(struct uniquenode) * (uq->used - 1));
 	}
 	uq->ids[v] = 0;
 	uq->used --;

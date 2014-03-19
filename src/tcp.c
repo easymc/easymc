@@ -224,7 +224,7 @@ static int tcp_set_keepalive(int fd){
 
 // Gets the minimum number of threads connected
 static struct tcp_area* tcp_least_thread(struct tcp_mgr * mgr){
-	uint index=0, count=EMC_SOCKETS_DEFAULT, result=0;
+	uint index = 0, count = EMC_SOCKETS_DEFAULT, result = 0;
 	for(index=0; index < get_device_thread(mgr->device); index++){
 		if(mgr->area[index].count < count){
 			count = mgr->area[index].count;
@@ -237,7 +237,7 @@ static struct tcp_area* tcp_least_thread(struct tcp_mgr * mgr){
 
 static int tcp_add_event(struct tcp_area * area, struct tcp_client * client, uint mask){
 #if defined (EMC_WINDOWS)
-	unsigned long flag=0, length=0;
+	unsigned long flag = 0, length = 0;
 	if(!CreateIoCompletionPort((HANDLE)client->fd, area->fd, client->id, 0)){
 		return -1;
 	}
@@ -327,7 +327,7 @@ static void tcp_post_monitor(struct tcp * tcp_, struct tcp_client * client, int 
 
 // The server sends the login back packet
 static void tcp_send_loginback(struct tcp * tcp_, int id, struct tcp_client * client){
-	void *msg=emc_msg_alloc(NULL, sizeof(ushort));
+	void * msg = emc_msg_alloc(NULL, sizeof(ushort));
 	emc_msg_setid(msg, id);
 	*(ushort *)emc_msg_buffer(msg) = client->mode;
 	if(tcp_send_data(tcp_,client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
@@ -398,23 +398,23 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 					}
 				}
 			}			
-		}else{
+		} else {
 			void * mg = NULL;
 			union data_serial serial = {0};
 
 			serial.id = id;
 			serial.serial = ((struct data_unit *)data)->serial;
-			if(map_get(tcp_->rmap,serial.no, (void **)&mg) < 0){
+			if(map_get(tcp_->rmap, serial.no, (void **)&mg) < 0){
 				mg = global_alloc_merger();
 				if(mg){
 					if(map_add(tcp_->rmap, serial.no, mg) < 0){
 						global_free_merger(mg);
-						mg=NULL;
+						mg = NULL;
 					}
 				}
 			}
 			if(mg){
-				int packets = ((struct data_unit *)data)->total/EMC_DATA_SIZE;
+				int packets = ((struct data_unit *)data)->total / EMC_DATA_SIZE;
 				if(((struct data_unit *)data)->total % EMC_DATA_SIZE){
 					packets ++;
 				}
@@ -442,11 +442,11 @@ static int tcp_recv_data(int fd, char * buf, int len){
 #if defined (EMC_WINDOWS)
 		if(WSAEWOULDBLOCK == WSAGetLastError()){
 			nread = 0;
-		}else return -1;
+		} else return -1;
 #else
-		if(errno==EINTR || errno==EWOULDBLOCK || errno==EAGAIN){
-			nread=0;
-		}else return -1;
+		if(errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN){
+			nread = 0;
+		} else return -1;
 #endif
 	}
 	else if(0 == nread) return -1;
@@ -480,7 +480,6 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	void * msg = NULL;
 
 	if(EMC_LIVE != tcp_->flag) return -1;
-
 	emc_lock(&tcp_->mgr->term_lck);
 	if(EMC_LOCAL == tcp_->type){
 		client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id);
@@ -530,7 +529,6 @@ static void process_recv(struct tcp * tcp_, struct tcp_area * area, int id){
 	char buffer[MAX_PROTOCOL_SIZE] = {0};
 
 	if(EMC_LIVE != tcp_->flag) return;
-
 	if(EMC_LOCAL == tcp_->type){
 		client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id);
 	}else if(EMC_REMOTE == tcp_->type){
@@ -759,8 +757,8 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 	uint length = 0, key = 0;
 	struct tcp_ol *ol = NULL;
 #else
-	int retval=-1, id=-1;
-	struct epoll_event	events[TCP_FD_SIZE];
+	int retval = -1, id = -1;
+	struct epoll_event events[TCP_FD_SIZE];
 #endif
 	struct tcp_area	* area = (struct tcp_area *)args;
 	struct tcp_mgr * mgr = area->mgr;
@@ -776,7 +774,7 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 						if(ol->client && ol->client->tcp_){
 							process_close(ol->client->tcp_, area, key);
 						}
-					}else{
+					} else {
 						if(ol->mask & EMC_READ){
 							if(ol->client && ol->client->tcp_){
 								process_recv(ol->client->tcp_, area, key);
@@ -785,7 +783,7 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 					}
 				}
 			}
-		}else{
+		} else {
 			if(WAIT_TIMEOUT != WSAGetLastError()){
 				if(ol && (STATUS_REMOTE_DISCONNECT == ol->ol.Internal ||
 					STATUS_LOCAL_DISCONNECT == ol->ol.Internal ||
@@ -805,7 +803,7 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 			int j = 0;
 			for (j = 0; j < retval; j++){
 				id = ((struct tcp_client *)events[j].data.ptr)->id;
-				if(id >=0 && id < EMC_SOCKETS_DEFAULT){
+				if(id >= 0 && id < EMC_SOCKETS_DEFAULT){
 					if(events[j].events & EPOLLIN){
 						if(events[j].data.ptr && ((struct tcp_client *)events[j].data.ptr)->tcp_){
 							process_recv(((struct tcp_client *)events[j].data.ptr)->tcp_, area, id);
@@ -838,9 +836,9 @@ static emc_cb_t EMC_CALL tcp_accept_cb(void * args){
 	struct tcp * tcp_ = (struct tcp *)args;
 	struct tcp_area * area = NULL;
 	struct sockaddr_in sa = {0};
-	int fd=-1, len=sizeof(struct sockaddr_in);
+	int fd = -1, len = sizeof(struct sockaddr_in);
 	while(!tcp_->exit){
-		fd=accept(tcp_->server->fd, (struct sockaddr*)&sa, &len);
+		fd = accept(tcp_->server->fd, (struct sockaddr*)&sa, &len);
 		if(fd > 0){
 			area = tcp_least_thread(tcp_->mgr);
 			process_accept(tcp_, area, fd, inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
@@ -889,7 +887,7 @@ static int init_tcp_server(struct tcp * tcp_){
 
 // The client sends the login packet
 static void tcp_send_login(struct tcp * tcp_){
-	void *msg=emc_msg_alloc(NULL, sizeof(ushort));
+	void * msg = emc_msg_alloc(NULL, sizeof(ushort));
 	emc_msg_setid(msg, tcp_->client->id);
 	*(ushort *)emc_msg_buffer(msg) = tcp_->client->mode;
 	if(tcp_send_data(tcp_,tcp_->client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
@@ -900,13 +898,13 @@ static void tcp_send_login(struct tcp * tcp_){
 // Tcp client initialization
 static int init_tcp_client(struct tcp * tcp_){
 #if defined (EMC_WINDOWS)
-	fd_set rdset={0}, wdset={0};
+	fd_set rdset = {0}, wdset = {0};
 	struct timeval tv = {0};
 #else
 	struct pollfd fds;
 #endif
 	struct sockaddr_in	addr = {0};
-	int size=0x10000, flag=1, erro=0, erro_len=sizeof(int), selecttime=5;
+	int size = 0x10000, flag = 1, erro = 0, erro_len = sizeof(int), selecttime = 5;
 
 	if(tcp_->client->id < 0){
 		tcp_->client->id = global_get_connect_id();
@@ -924,7 +922,7 @@ static int init_tcp_client(struct tcp * tcp_){
 		errno = EINVAL;
 		return -1;
 	}
-	if(0 != tcp_set_keepalive(tcp_->client->fd)){
+	if(tcp_set_keepalive(tcp_->client->fd) < 0){
 		_close_socket(tcp_->client->fd);
 		errno = EINVAL;
 		return -1;
@@ -939,7 +937,7 @@ static int init_tcp_client(struct tcp * tcp_){
 		errno = EINVAL;
 		return -1;
 	}
-	if(0!=setsockopt(tcp_->client->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag))){
+	if(setsockopt(tcp_->client->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag)) < 0){
 		_close_socket(tcp_->client->fd);
 		errno = EINVAL;
 		return -1;
@@ -1048,7 +1046,7 @@ int init_tcp_mgr(struct tcp_mgr *mgr, int thread){
 		return -1;
 	}
 	memset(mgr->area, 0, sizeof(struct tcp_area) * thread);
-	for(index=0; index < thread; index++){
+	for(index = 0; index < thread; index ++){
 		mgr->area[index].wmq = create_uqueue();
 #if defined (EMC_WINDOWS)
 		mgr->area[index].fd  = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
@@ -1056,14 +1054,14 @@ int init_tcp_mgr(struct tcp_mgr *mgr, int thread){
 		mgr->area[index].fd  = epoll_create(EMC_SOCKETS_DEFAULT);
 #endif
 		mgr->area[index].mgr = mgr;
-		mgr->area[index].twork = emc_thread(tcp_work_cb, mgr->area+index);
-		mgr->area[index].tsend = emc_thread(tcp_send_cb, mgr->area+index);
+		mgr->area[index].twork = emc_thread(tcp_work_cb, mgr->area + index);
+		mgr->area[index].tsend = emc_thread(tcp_send_cb, mgr->area + index);
 	}
 	return 0;
 }
 
 struct tcp_mgr * create_tcp_mgr(int device, int thread){
-	struct tcp_mgr *mgr = (struct tcp_mgr *)malloc(sizeof(struct tcp_mgr));
+	struct tcp_mgr * mgr = (struct tcp_mgr *)malloc(sizeof(struct tcp_mgr));
 	if(!mgr) {
 		errno = ENOMEM;
 		return NULL;
@@ -1139,7 +1137,7 @@ struct tcp * add_tcp(uint ip, ushort port, ushort mode, int type, int plug, stru
 void delete_tcp_mgr(struct tcp_mgr * mgr){
 	uint index = 0;
 	mgr->exit = 1;
-	for(index=0; index < get_device_thread(mgr->device); index++){
+	for(index = 0; index < get_device_thread(mgr->device); index ++){
 #if defined (EMC_WINDOWS)
 		PostQueuedCompletionStatus(mgr->area[index].fd, 0xFFFFFFFF, 0, NULL);
 		CloseHandle(mgr->area[index].fd);
@@ -1183,7 +1181,7 @@ int close_tcp(struct tcp * tcp_, int id){
 	if(!(client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id))){
 		return -1;
 	}
-	return process_close(tcp_,client->area,id);
+	return process_close(tcp_, client->area, id);
 }
 
 int send_tcp(struct tcp * tcp_, void * msg, int flag){
@@ -1194,7 +1192,7 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 	}
 	if(EMC_LOCAL == tcp_->type){
 		if(EMC_REQ == emc_msg_get_mode(msg)){
-			emc_msg_set_mode(msg,EMC_REP);
+			emc_msg_set_mode(msg, EMC_REP);
 		}
 		if(EMC_SUB == emc_msg_get_mode(msg)){
 			tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_SNDFAIL, msg);

@@ -62,7 +62,7 @@ struct unpack *unpack_new(unsigned int count){
 	emc_queue_init(&un->idle);
 	un->units = (struct unpack_unit *)malloc(sizeof(struct unpack_unit) * count);
 	memset(un->units, 0, sizeof(struct unpack_unit) * count);
-	for(index=0; index<count; index++){
+	for(index = 0; index < count; index ++){
 		emc_queue_init(&un->units[index].queue);
 		emc_queue_insert_tail(&un->idle, &un->units[index].queue);
 	}
@@ -94,38 +94,38 @@ int unpack_add(void* block, char * data, int len){
 		unit->buffer = (char*)malloc(UNPACK_BUFFER_SIZE);
 		memset(unit->buffer, 0, UNPACK_BUFFER_SIZE);
 	}
-	memcpy(unit->buffer+unit->len, data, (unit->len+len)>UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE-unit->len):len);
-	unit->len += (unit->len+len)>UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE-unit->len):len;
-	return (unit->len+len)>UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE-unit->len):len;
+	memcpy(unit->buffer + unit->len, data, (unit->len + len) > UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE - unit->len):len);
+	unit->len += (unit->len + len) > UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE - unit->len):len;
+	return (unit->len + len) > UNPACK_BUFFER_SIZE?(UNPACK_BUFFER_SIZE - unit->len):len;
 }
 
 static ushort unpack_get_peer(struct unpack_unit * unit, char * buffer){
-	ushort length=0, len=0;
-	char *rpos = unit->buffer;
+	ushort length = 0, len = 0;
+	char * rpos = unit->buffer;
 	while(unit->len && EMC_HEAD != *(ushort*)rpos){
 		rpos ++;
 		unit->len --;
 	}
 	if(!unit->len) return 0;
-	len = length = *(ushort*)(rpos+sizeof(ushort));
+	len = length = *(ushort*)(rpos + sizeof(ushort));
 	if(0x8000 < length){// After compression
 		length ^= 0x8000;
 	}
 	if(length > MAX_DATA_SIZE){
-		memmove(unit->buffer, rpos+sizeof(ushort), unit->len-sizeof(ushort));
+		memmove(unit->buffer, rpos + sizeof(ushort), unit->len - sizeof(ushort));
 		unit->len -= sizeof(ushort);
 		return 0;
 	}
-	if(unit->len < (length+sizeof(uint))){
+	if(unit->len < (length + sizeof(uint))){
 		if(rpos > unit->buffer){
 			memmove(unit->buffer, rpos, unit->len);
 		}
 		return 0;
 	}
-	memcpy(buffer, rpos+sizeof(uint), length);
-	rpos += (length+sizeof(uint));
-	unit->len -= (length+sizeof(uint));
-	if(unit->len > 0 && unit->len < UNPACK_BUFFER_SIZE && rpos > unit->buffer && rpos < unit->buffer+UNPACK_BUFFER_SIZE){
+	memcpy(buffer, rpos + sizeof(uint), length);
+	rpos += (length + sizeof(uint));
+	unit->len -= (length + sizeof(uint));
+	if(unit->len > 0 && unit->len < UNPACK_BUFFER_SIZE && rpos > unit->buffer && rpos < unit->buffer + UNPACK_BUFFER_SIZE){
 		memmove(unit->buffer, rpos, unit->len);
 	}
 	return len;

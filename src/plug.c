@@ -146,7 +146,7 @@ int emc_connect(int plug, ushort mode, const char * ip, const ushort port){
 }
 
 int emc_control(int plug, int id, int ctl){
-	int result=-1;
+	int result = -1;
 	struct easymc_plug * pg = (struct easymc_plug *)global_get_plug(plug);
 	if(!pg){
 		errno = ENOPLUG;
@@ -179,7 +179,7 @@ int emc_close(int plug){
 		return -1;
 	}
 	del_device_plug(pg->device, plug);
-	for(index = 0; index < 0xFFFF; index++){
+	for(index = 0; index < 0xFFFF; index ++){
 		post_ringqueue(pg->mq);
 	}
 	if(pg->ipc_){

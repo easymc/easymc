@@ -47,15 +47,15 @@ struct map{
 #pragma pack()
 
 static int map_sort_swap(struct map * m, int64 key, void * val){
-	int low=0, mid=0, high=m->used-1;
+	int low = 0, mid = 0, high = m->used - 1;
 
-	while(high>=0 && low<m->used  && low <= high){
-		mid = (low+high)/2;
+	while(high >= 0 && low < m->used  && low <= high){
+		mid = (low+high) / 2;
 		if(key == m->node[mid].key) return -1;
 		else if(key < m->node[mid].key){
-			high = mid-1;
+			high = mid - 1;
 		}else{
-			low = mid+1;
+			low = mid + 1;
 		}
 	}
 
@@ -64,7 +64,7 @@ static int map_sort_swap(struct map * m, int64 key, void * val){
 			m->node[m->used].key = key;
 			m->node[m->used].p = val;
 		}else{
-			memmove(m->node+low+1, m->node+low, (m->used-low)*sizeof(struct map_node));
+			memmove(m->node+low + 1, m->node + low, (m->used - low) * sizeof(struct map_node));
 			m->node[low].key = key;
 			m->node[low].p = val;
 		}
@@ -77,16 +77,16 @@ static int map_sort_swap(struct map * m, int64 key, void * val){
 }
 
 static int map_search_cb(struct map * m, int64 key){
-	int low=0, mid=0, high=m->used-1;
-	while(high>=0 && low<m->used && low <= high){
-		mid = (low+high)/2;
+	int low = 0, mid = 0, high = m->used - 1;
+	while(high >= 0 && low < m->used && low <= high){
+		mid = (low + high) / 2;
 		if(key == m->node[mid].key){
 			return mid;
 		}
 		else if(key < m->node[mid].key){
-			high = mid-1;
+			high = mid - 1;
 		}else{
-			low = mid+1;
+			low = mid + 1;
 		}
 	}
 	return -1;
@@ -114,7 +114,7 @@ int map_add(struct map * m, int64 key, void * val){
 		return -1;
 	}
 	if(m->used >= m->size){
-		m->node = (struct map_node*)realloc(m->node, 2*m->size*sizeof(struct map_node));
+		m->node = (struct map_node*)realloc(m->node, 2 * m->size * sizeof(struct map_node));
 		m->size *= 2;
 	}
 	map_sort_swap(m, key, val);
@@ -200,9 +200,9 @@ int	map_erase(struct map * m, int64 key){
 	m->node[n].key = -1;
 	m->node[n].p = NULL;
 	_node = &m->node[n];
-	if(_node != &m->node[m->used-1]){
-		uint index = ((char*)_node-(char*)&m->node[0])/sizeof(struct map_node);
-		memmove(m->node+index, m->node+index+1, (m->used-1-index)*(sizeof(struct map_node)));
+	if(_node != &m->node[m->used - 1]){
+		uint index = ((char*)_node - (char*)&m->node[0]) / sizeof(struct map_node);
+		memmove(m->node + index, m->node + index + 1, (m->used - 1 - index) * (sizeof(struct map_node)));
 	}
 	m->used --;
 	if(locked){
@@ -216,7 +216,7 @@ void map_foreach(struct map * m, map_foreach_cb * cb, void * addition){
 
 	emc_lock(&m->lock);
 	emc_lock(&m->foreach);
-	for(index=0; index<m->used; index++){
+	for(index = 0; index < m->used; index ++){
 		if(cb){
 			if(cb(m, m->node[index].key, m->node[index].p, addition)){
 				index --;
