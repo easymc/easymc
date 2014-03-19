@@ -82,10 +82,15 @@ int emc_device(void){
 }
 
 void emc_destory(int device){
-	struct emc_device * ed = (struct emc_device *)global_get_device(device);
+	int index = 0;
+	struct emc_device * ed = NULL;
+	
+	ed = (struct emc_device *)global_get_device(device);
 	if(ed){
 		hashmap_foreach(ed->plug_map, plug_delete_cb, NULL);
-		post_ringqueue(ed->mmq);
+		for(index = 0; index < 0xFFFF; index++){
+			post_ringqueue(ed->mmq);
+		}
 		nsleep(100);
 		delete_ringqueue(ed->mmq);
 		ed->mmq = NULL;

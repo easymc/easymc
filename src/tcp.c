@@ -404,7 +404,7 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 
 			serial.id = id;
 			serial.serial = ((struct data_unit *)data)->serial;
-			if(map_get(tcp_->rmap,serial.no, (void**)&mg) < 0){
+			if(map_get(tcp_->rmap,serial.no, (void **)&mg) < 0){
 				mg = global_alloc_merger();
 				if(mg){
 					if(map_add(tcp_->rmap, serial.no, mg) < 0){
@@ -422,7 +422,7 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 				merger_add(mg, ((struct data_unit *)data)->no, 
 					((struct data_unit *)data)->no * EMC_DATA_SIZE, data+sizeof(struct data_unit), 
 					len-sizeof(struct data_unit));
-				if(0==merger_get(mg, tcp_merger_cb, id, tcp_)){
+				if(0 == merger_get(mg, tcp_merger_cb, id, tcp_)){
 					global_free_merger(mg);
 					map_erase(tcp_->rmap, serial.no);
 				}
@@ -584,6 +584,7 @@ static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort c
 		return -1;
 	}else{
 		if(push_uqueue(client->area->wmq, client->id, client->tcp_) < 0){
+			data->flag = EMC_DEAD;
 			emc_msg_ref_dec(msg);
 			free(data);
 			return -1;
@@ -621,11 +622,10 @@ static int tcp_data_sep(struct tcp_data * data, char * buffer, int id){
 static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
 	struct tcp_client * client = NULL;
 	struct tcp_data * data = NULL;
-	int nsend=-1, length=0, timeout=0;
+	int nsend = -1, length = 0;
 	char buffer[MAX_PROTOCOL_SIZE] = {0};
 
 	if(EMC_LIVE != tcp_->flag) return -1;
-
 	if(EMC_LOCAL == tcp_->type){
 		client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id);
 	}else if(EMC_REMOTE == tcp_->type){
@@ -638,10 +638,9 @@ static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
 		return -1;
 	}
 	while(1){
-		if(global_pop_sendqueue(id, (void **)&data) < 0){
+		if(global_pop_sendqueue(id, (void **)&data) < 0 || !data || EMC_LIVE != data->flag){
 			break;
 		}
-		timeout = timeGetTime();
 		while(data->lave > 0){
 			length = tcp_data_sep(data, buffer, id);
 #if defined (EMC_WINDOWS)
@@ -653,24 +652,21 @@ static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
 #if defined (EMC_WINDOWS)
 				if(WSAEWOULDBLOCK == WSAGetLastError()){
 #else
-				if (errno==EINTR || errno==EWOULDBLOCK || errno==EAGAIN){
+				if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN){
 #endif
-					if((timeGetTime()-timeout) > TCP_TIMEOUT){
-						// Transmission fails, the data added to the queue
-						if(global_push_head_sendqueue(id, data) < 0){
-							// If you set the monitor option throws up send failure message
-							if(EMC_CMD_DATA == data->cmd){
-								tcp_post_monitor(tcp_, client, EMC_EVENT_SNDFAIL, data->msg);
-							}
-							emc_msg_ref_dec(data->msg);
-							// Join transmit queue fails, check whether the message reference count is 0, then consider the release of the message buffer
-							tcp_release_msg(data);
-							return -1;
+					// Transmission fails, the data added to the queue
+					if(global_push_head_sendqueue(id, data) < 0){
+						// If you set the monitor option throws up send failure message
+						if(EMC_CMD_DATA == data->cmd){
+							tcp_post_monitor(tcp_, client, EMC_EVENT_SNDFAIL, data->msg);
 						}
-						push_uqueue(area->wmq, id, tcp_);
+						emc_msg_ref_dec(data->msg);
+						// Join transmit queue fails, check whether the message reference count is 0, then consider the release of the message buffer
+						tcp_release_msg(data);
 						return -1;
 					}
-					continue;
+					push_uqueue(area->wmq, id, tcp_);
+					return -1;
 				}
 				emc_msg_ref_dec(data->msg);
 				if(EMC_CMD_DATA == data->cmd){

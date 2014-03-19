@@ -46,7 +46,7 @@ struct easymc_plug{
 	ushort				mode;
 	struct ipc			*ipc_;
 	struct tcp			*tcp_;
-	//Message queue
+	// Message queue
 	struct ringqueue	*mq;
 };
 
@@ -72,7 +72,13 @@ int emc_plug(int device){
 		errno = EUSERS;
 		return -1;
 	}
-	add_device_plug(device, id, pg);
+	if(add_device_plug(device, id, pg) < 0){
+		global_erase_plug(id);
+		delete_ringqueue(pg->mq);
+		free(pg);
+		errno = ENODEVICE;
+		return -1;
+	}
 	pg->id = id;
 	return id;
 }
@@ -163,14 +169,19 @@ int emc_control(int plug, int id, int ctl){
 }
 
 int emc_close(int plug){
+	int index = 0;
 	void * msg = NULL;
-	struct easymc_plug * pg = (struct easymc_plug *)global_get_plug(plug);
+	struct easymc_plug * pg = NULL;
+	
+	pg = (struct easymc_plug *)global_get_plug(plug);
 	if(!pg){
 		errno = ENOPLUG;
 		return -1;
 	}
 	del_device_plug(pg->device, plug);
-	post_ringqueue(pg->mq);
+	for(index = 0; index < 0xFFFF; index++){
+		post_ringqueue(pg->mq);
+	}
 	if(pg->ipc_){
 		delete_ipc(pg->ipc_);
 	}
