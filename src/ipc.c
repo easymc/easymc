@@ -48,7 +48,6 @@
 
 #define IPC_BUFFER_SIZE		(0x9000E8)
 #define IPC_PEER_SIZE		(0x100014)
-#define IPC_DATA_SIZE		(0x100000)
 #define IPC_TIMEOUT			(5000)
 #define IPC_TASK_TIMEOUT	(60000)
 #define IPC_CHECK_TIMEOUT	(30000)
@@ -538,29 +537,32 @@ static int reopen_ipc(struct ipc * ipc_){
 }
 
 static int process_ipc_data(struct ipc * ipc_, char * data){
-	if(((struct data_unit *)data)->len == ((struct data_unit *)data)->total){
-		ipc_complete_data(ipc_, ((struct data_unit *)data)->id, ((struct data_unit *)data)->cmd, data+sizeof(struct data_unit),
-			((struct data_unit *)data)->len);
+	if(((struct ipc_data_unit *)data)->total <= IPC_DATA_SIZE){
+		ipc_complete_data(ipc_, ((struct ipc_data_unit *)data)->id, ((struct ipc_data_unit *)data)->cmd, data+sizeof(struct ipc_data_unit),
+			((struct ipc_data_unit *)data)->total);
 	}else{
+		int packets = 0;
 		void * mg = NULL;
 		union data_serial serial = {0};
-		serial.id = ((struct data_unit *)data)->id;
-		serial.serial = ((struct data_unit *)data)->serial;
-
+		serial.id = ((struct ipc_data_unit *)data)->id;
+		serial.serial = ((struct ipc_data_unit *)data)->serial;
+		packets = ((struct ipc_data_unit *)data)->total / IPC_DATA_SIZE;
+		if(((struct ipc_data_unit *)data)->total % IPC_DATA_SIZE){
+			packets ++;
+		}
 		if(map_get(ipc_->rmap, serial.no, (void **)&mg) < 0){
-			int packets = ((struct data_unit *)data)->total / EMC_DATA_SIZE;
-			if(((struct data_unit *)data)->total % EMC_DATA_SIZE){
-				packets ++;
-			}
 			mg = global_alloc_merger();
 			if(!mg) return -1;
-			merger_init(mg, ((struct data_unit *)data)->total, packets);
+			merger_init(mg, ((struct ipc_data_unit *)data)->total, packets);
 			map_add(ipc_->rmap, serial.no, mg);
 		}
 		if(mg){
-			merger_add(mg, ((struct data_unit *)data)->no, ((struct data_unit *)data)->no * EMC_DATA_SIZE, 
-				data+sizeof(struct data_unit), ((struct data_unit *)data)->len);
-			if(0 == merger_get(mg, ipc_merger_cb, ((struct data_unit *)data)->id, ipc_)){
+			int length = ((struct ipc_data_unit *)data)->no < (packets - 1)?IPC_DATA_SIZE:
+				(((struct ipc_data_unit *)data)->total - (packets - 1) * IPC_DATA_SIZE);
+			merger_add(mg, ((struct ipc_data_unit *)data)->no,
+				((struct ipc_data_unit *)data)->no * IPC_DATA_SIZE, 
+				data + sizeof(struct ipc_data_unit), length);
+			if(0 == merger_get(mg, ipc_merger_cb, ((struct ipc_data_unit *)data)->id, ipc_)){
 				global_free_merger(mg);
 				map_erase(ipc_->rmap, serial.no);
 			}
@@ -592,26 +594,25 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 	char buffer[MAX_DATA_SIZE] = {0};
 
 	if(!client->buffer) return -1;
-	if(MAX_DATA_SIZE >= (length + sizeof(struct data_unit))){
+	if(MAX_DATA_SIZE >= (length + sizeof(struct ipc_data_unit))){
 		// As long as you can send a packet to complete
-		((struct data_unit *)buffer)->cmd = cmd;
-		((struct data_unit *)buffer)->id = id;
-		((struct data_unit *)buffer)->no = 0;
-		((struct data_unit *)buffer)->serial = global_get_data_serial();
-		((struct data_unit *)buffer)->total = length;
-		((struct data_unit *)buffer)->len = length;
+		((struct ipc_data_unit *)buffer)->cmd = cmd;
+		((struct ipc_data_unit *)buffer)->id = id;
+		((struct ipc_data_unit *)buffer)->no = 0;
+		((struct ipc_data_unit *)buffer)->serial = global_get_data_serial();
+		((struct ipc_data_unit *)buffer)->total = length;
 		if(data && length){
-			memcpy(buffer+sizeof(struct data_unit), data, length);
+			memcpy(buffer+sizeof(struct ipc_data_unit), data, length);
 		}
 		if(EMC_CMD_DATA != cmd){
 			if(EMC_LOCAL == ipc_->type){
 				if(push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
-					buffer,length + sizeof(struct data_unit)) < 0){
+					buffer,length + sizeof(struct ipc_data_unit)) < 0){
 						return -1;
 				}
 			}else if(EMC_REMOTE == ipc_->type){
 				if(push_ringbuffer((struct ringbuffer *)(client->buffer + 2 * sizeof(uint) + get_ringarray_size()),
-					buffer,length + sizeof(struct data_unit)) < 0){
+					buffer,length + sizeof(struct ipc_data_unit)) < 0){
 					return -1;
 				}
 			}
@@ -619,12 +620,12 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 			while(client->connected){
 				if(EMC_LOCAL == ipc_->type){
 					if(0 == push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
-						buffer,length + sizeof(struct data_unit))){
+						buffer,length + sizeof(struct ipc_data_unit))){
 							break;
 					}
 				}else if(EMC_REMOTE == ipc_->type){
 					if(0 == push_ringbuffer((struct ringbuffer *)(client->buffer + 2 * sizeof(uint) + get_ringarray_size()),
-						buffer,length + sizeof(struct data_unit))){
+						buffer,length + sizeof(struct ipc_data_unit))){
 						break;
 					}
 				}
@@ -637,33 +638,32 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 		// Multi-packet transmission
 		uint package = 0,index = 0;
 
-		((struct data_unit *)buffer)->cmd = EMC_CMD_DATA;
-		((struct data_unit *)buffer)->id = id;
-		((struct data_unit *)buffer)->serial = global_get_data_serial();
-		((struct data_unit *)buffer)->total = length;
-		package = length / EMC_DATA_SIZE;
-		package += (length % EMC_DATA_SIZE)?1:0;
+		((struct ipc_data_unit *)buffer)->cmd = EMC_CMD_DATA;
+		((struct ipc_data_unit *)buffer)->id = id;
+		((struct ipc_data_unit *)buffer)->serial = global_get_data_serial();
+		((struct ipc_data_unit *)buffer)->total = length;
+		package = length / IPC_DATA_SIZE;
+		package += (length % IPC_DATA_SIZE)?1:0;
 		for(index=0; index<package; index++){
-			((struct data_unit *)buffer)->no = index;
-			((struct data_unit *)buffer)->len = (length > EMC_DATA_SIZE)?EMC_DATA_SIZE:length;
-			memcpy(buffer+sizeof(struct data_unit), data, ((struct data_unit *)buffer)->len);
+			((struct ipc_data_unit *)buffer)->no = index;
+			memcpy(buffer+sizeof(struct ipc_data_unit), data, length > IPC_DATA_SIZE?IPC_DATA_SIZE:length);
 			while(client->connected){
 				if(EMC_LOCAL == ipc_->type){
 					if(0==push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
-						buffer, ((struct data_unit *)buffer)->len + sizeof(struct data_unit))){
+						buffer, length > IPC_DATA_SIZE?IPC_DATA_SIZE:length + sizeof(struct ipc_data_unit))){
 							break;
 					}
 				}else if(EMC_REMOTE == ipc_->type){
 					if(0 == push_ringbuffer((struct ringbuffer *)(client->buffer + 2 * sizeof(uint) + get_ringarray_size()),
-						buffer, ((struct data_unit *)buffer)->len + sizeof(struct data_unit))){
+						buffer, length > IPC_DATA_SIZE?IPC_DATA_SIZE:length + sizeof(struct ipc_data_unit))){
 						break;
 					}
 				}
 				ipc_read_post(client);
 				micro_wait(1);
 			}
-			length -= ((struct data_unit *)buffer)->len;
-			data += ((struct data_unit *)buffer)->len;
+			length -= length > IPC_DATA_SIZE?IPC_DATA_SIZE:length;
+			data += length > IPC_DATA_SIZE?IPC_DATA_SIZE:length;
 		}
 		ipc_read_post(client);
 	}

@@ -73,7 +73,7 @@ struct tcp_data{
 	// Whether to wait
 	int				wait;
 	// Command
-	ushort			cmd;
+	uchar			cmd;
 	// Serial Number
 	uint			serial;
 	// Original length
@@ -172,7 +172,7 @@ struct tcp_mgr{
 
 static int init_tcp_client(struct tcp * tcp_);
 static void tcp_send_login(struct tcp * tcp_);
-static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort cmd, int flag, void * msg);
+static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, uchar cmd, int flag, void * msg);
 
 //Cas Operate
 static uint tcp_number_cas(volatile uint * key, uint _old, uint _new){
@@ -373,16 +373,16 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 		client = tcp_->client;
 	}
 	if(client){
-		if(((struct data_unit *)data)->len == ((struct data_unit *)data)->total){
-			if(EMC_CMD_LOGIN == ((struct data_unit *)data)->cmd){
+		if(((struct tcp_data_unit *)data)->total <= TCP_DATA_SIZE){
+			if(EMC_CMD_LOGIN == ((struct tcp_data_unit *)data)->cmd){
 				if(EMC_LOCAL == tcp_->type){
-					client->mode = *(ushort *)(data+sizeof(struct data_unit));
+					client->mode = *(ushort *)(data+sizeof(struct tcp_data_unit));
 					tcp_send_loginback(tcp_, id, client);
 				}else if(EMC_REMOTE == tcp_->type){
 					tcp_number_add(&client->completed);
 				}
-			}else if(EMC_CMD_DATA == ((struct data_unit *)data)->cmd){
-				struct message * msg = (struct message *)emc_msg_alloc(data+sizeof(struct data_unit), len-sizeof(struct data_unit));
+			}else if(EMC_CMD_DATA == ((struct tcp_data_unit *)data)->cmd){
+				struct message * msg = (struct message *)emc_msg_alloc(data+sizeof(struct tcp_data_unit), len-sizeof(struct tcp_data_unit));
 				if(msg){
 					emc_msg_setid(msg, id);
 					emc_msg_set_mode(msg, client->mode);
@@ -403,7 +403,7 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 			union data_serial serial = {0};
 
 			serial.id = id;
-			serial.serial = ((struct data_unit *)data)->serial;
+			serial.serial = ((struct tcp_data_unit *)data)->serial;
 			if(map_get(tcp_->rmap, serial.no, (void **)&mg) < 0){
 				mg = global_alloc_merger();
 				if(mg){
@@ -414,14 +414,14 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 				}
 			}
 			if(mg){
-				int packets = ((struct data_unit *)data)->total / EMC_DATA_SIZE;
-				if(((struct data_unit *)data)->total % EMC_DATA_SIZE){
+				int packets = ((struct tcp_data_unit *)data)->total / TCP_DATA_SIZE;
+				if(((struct tcp_data_unit *)data)->total % TCP_DATA_SIZE){
 					packets ++;
 				}
-				merger_init(mg, ((struct data_unit *)data)->total, packets);
-				merger_add(mg, ((struct data_unit *)data)->no, 
-					((struct data_unit *)data)->no * EMC_DATA_SIZE, data+sizeof(struct data_unit), 
-					len-sizeof(struct data_unit));
+				merger_init(mg, ((struct tcp_data_unit *)data)->total, packets);
+				merger_add(mg, ((struct tcp_data_unit *)data)->no, 
+					((struct tcp_data_unit *)data)->no * TCP_DATA_SIZE, data+sizeof(struct tcp_data_unit), 
+					len-sizeof(struct tcp_data_unit));
 				if(0 == merger_get(mg, tcp_merger_cb, id, tcp_)){
 					global_free_merger(mg);
 					map_erase(tcp_->rmap, serial.no);
@@ -562,7 +562,7 @@ static void process_recv(struct tcp * tcp_, struct tcp_area * area, int id){
 	}
 }
 
-static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, ushort cmd, int flag, void * msg){
+static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, uchar cmd, int flag, void * msg){
 	struct tcp_data * data = (struct tcp_data *)malloc(sizeof(struct tcp_data));
 	if(!data) return -1;
 
@@ -605,16 +605,14 @@ static uint tcp_pub_foreach_cb(struct hashmap * m, int key, void * p, void * add
 // Subcontracting send data
 static int tcp_data_sep(struct tcp_data * data, char * buffer, int id){
 	*(ushort *)buffer = EMC_HEAD;
-	*(ushort *)(buffer+sizeof(ushort)) = data->lave>EMC_DATA_SIZE?MAX_DATA_SIZE:(data->lave+sizeof(struct data_unit));
-	((struct data_unit *)(buffer+sizeof(uint)))->cmd = data->cmd;
-	((struct data_unit *)(buffer+sizeof(uint)))->id = id;
-	((struct data_unit *)(buffer+sizeof(uint)))->serial = data->serial;
-	((struct data_unit *)(buffer+sizeof(uint)))->total = data->len;
-	((struct data_unit *)(buffer+sizeof(uint)))->len = data->lave>EMC_DATA_SIZE?EMC_DATA_SIZE:data->lave;
-	((struct data_unit *)(buffer+sizeof(uint)))->no = (data->len-data->lave)/EMC_DATA_SIZE;
-	memcpy(buffer+sizeof(uint)+sizeof(struct data_unit), (char *)emc_msg_buffer(data->msg)+(data->len-data->lave),
-		data->lave>EMC_DATA_SIZE?EMC_DATA_SIZE:data->lave);
-	return data->lave>EMC_DATA_SIZE?MAX_PROTOCOL_SIZE:(data->lave+sizeof(struct data_unit)+sizeof(uint));
+	*(ushort *)(buffer + sizeof(ushort)) = data->lave>TCP_DATA_SIZE?MAX_DATA_SIZE:(data->lave + sizeof(struct tcp_data_unit));
+	((struct tcp_data_unit *)(buffer + sizeof(uint)))->cmd = data->cmd;
+	((struct tcp_data_unit *)(buffer + sizeof(uint)))->serial = data->serial;
+	((struct tcp_data_unit *)(buffer + sizeof(uint)))->total = data->len;
+	((struct tcp_data_unit *)(buffer + sizeof(uint)))->no = (data->len-data->lave)/TCP_DATA_SIZE;
+	memcpy(buffer + sizeof(uint) + sizeof(struct tcp_data_unit), (char *)emc_msg_buffer(data->msg) + (data->len-data->lave),
+		data->lave > TCP_DATA_SIZE?TCP_DATA_SIZE:data->lave);
+	return data->lave > TCP_DATA_SIZE?MAX_PROTOCOL_SIZE:(data->lave + sizeof(struct tcp_data_unit) + sizeof(uint));
 }
 
 static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
@@ -682,7 +680,7 @@ static int process_send(struct tcp * tcp_, struct tcp_area * area, int id){
 				process_close(tcp_, area, id);
 				return -1;
 			}else{
-				data->lave -= (nsend-sizeof(uint)-sizeof(struct data_unit));
+				data->lave -= (nsend-sizeof(uint)-sizeof(struct tcp_data_unit));
 			}
 		}
 		// If you set the monitor option throws up send success message

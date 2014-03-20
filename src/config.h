@@ -139,17 +139,19 @@
 #define MAX_DATA_SIZE	8192
 // Protocol packet size
 #define MAX_PROTOCOL_SIZE	8196
-//Data length
-#define EMC_DATA_SIZE	8172
+//tcp data length
+#define TCP_DATA_SIZE	8179
+//ipc data length
+#define IPC_DATA_SIZE	8175
 // Header logo
 #define EMC_HEAD		0x5876
 
 // Login command
-#define EMC_CMD_LOGIN	0x5861
+#define EMC_CMD_LOGIN	0x61
 // Logout command
-#define EMC_CMD_LOGOUT	0x5862
+#define EMC_CMD_LOGOUT	0x62
 // Data command
-#define EMC_CMD_DATA	0x5863
+#define EMC_CMD_DATA	0x63
 
 //Loopback address 127.0.0.1
 #define LOOPBACK		0x100007F

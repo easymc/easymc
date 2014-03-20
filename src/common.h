@@ -33,17 +33,26 @@
 
 #pragma pack(1)
 // Packet protocol
-struct data_unit{
+struct ipc_data_unit{
 	// Command
-	ushort	cmd;
+	uchar	cmd;
 	// The number of clients receiving the data
 	int		id;
 	// Data unique serial number
 	int		serial;
 	// The total length
 	int		total;
-	// The packet length
-	ushort	len;
+	// The packet sequence number
+	int		no;
+};
+
+struct tcp_data_unit{
+	// Command
+	uchar	cmd;
+	// Data unique serial number
+	int		serial;
+	// The total length
+	int		total;
 	// The packet sequence number
 	int		no;
 };
