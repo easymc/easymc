@@ -179,7 +179,7 @@ static int  ipc_send_register(struct ipc * ipc_, char * data, int len){
 
 // Send registration response packet to the client
 static int ipc_send_register_bc(struct ipc * ipc_, struct ipc_client * client){
-	return write_ipc_data(ipc_, client, client->id, EMC_CMD_LOGIN,NULL, 0 );
+	return write_ipc_data(ipc_, client, client->id, EMC_CMD_LOGIN, NULL, 0 );
 }
 
 // delete all recv task unit
@@ -605,17 +605,17 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 		((struct ipc_data_unit *)buffer)->serial = global_get_data_serial();
 		((struct ipc_data_unit *)buffer)->total = length;
 		if(data && length){
-			memcpy(buffer+sizeof(struct ipc_data_unit), data, length);
+			memcpy(buffer + sizeof(struct ipc_data_unit), data, length);
 		}
 		if(EMC_CMD_DATA != cmd){
 			if(EMC_LOCAL == ipc_->type){
 				if(push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
-					buffer,length + sizeof(struct ipc_data_unit)) < 0){
+					buffer, length + sizeof(struct ipc_data_unit)) < 0){
 						return -1;
 				}
 			}else if(EMC_REMOTE == ipc_->type){
 				if(push_ringbuffer((struct ringbuffer *)(client->buffer + 2 * sizeof(uint) + get_ringarray_size()),
-					buffer,length + sizeof(struct ipc_data_unit)) < 0){
+					buffer, length + sizeof(struct ipc_data_unit)) < 0){
 					return -1;
 				}
 			}
@@ -623,12 +623,12 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 			while(client->connected){
 				if(EMC_LOCAL == ipc_->type){
 					if(0 == push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
-						buffer,length + sizeof(struct ipc_data_unit))){
+						buffer, length + sizeof(struct ipc_data_unit))){
 							break;
 					}
 				}else if(EMC_REMOTE == ipc_->type){
 					if(0 == push_ringbuffer((struct ringbuffer *)(client->buffer + 2 * sizeof(uint) + get_ringarray_size()),
-						buffer,length + sizeof(struct ipc_data_unit))){
+						buffer, length + sizeof(struct ipc_data_unit))){
 						break;
 					}
 				}
@@ -647,9 +647,9 @@ static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id,
 		((struct ipc_data_unit *)buffer)->total = length;
 		package = length / IPC_DATA_SIZE;
 		package += (length % IPC_DATA_SIZE)?1:0;
-		for(index=0; index<package; index++){
+		for(index = 0; index < package; index ++){
 			((struct ipc_data_unit *)buffer)->no = index;
-			memcpy(buffer+sizeof(struct ipc_data_unit), data, length > IPC_DATA_SIZE?IPC_DATA_SIZE:length);
+			memcpy(buffer + sizeof(struct ipc_data_unit), data, length > IPC_DATA_SIZE?IPC_DATA_SIZE:length);
 			while(client->connected){
 				if(EMC_LOCAL == ipc_->type){
 					if(0==push_ringbuffer((struct ringbuffer *)(client->buffer + sizeof(uint)),
@@ -742,7 +742,7 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 		break;
 	case EMC_PUB:
 		{
-			struct ipc_data unit = {0,flag,ipc_,msg};
+			struct ipc_data unit = {0, flag, ipc_, msg};
 			map_foreach(ipc_->server->connection, ipc_send_pub_foreach_cb, &unit);
 		}
 		break;
@@ -847,7 +847,7 @@ static emc_cb_t EMC_CALL ipc_check_cb(void * args){
 	while(!ipc_->exit){
 		check_ipc(ipc_, &reconnect_time);
 		// Receive data every 30 seconds to detect whether the task timeout
-		if(timeGetTime()-check_time > IPC_CHECK_TIMEOUT){
+		if(timeGetTime() - check_time > IPC_CHECK_TIMEOUT){
 			map_foreach(ipc_->rmap, map_foreach_task_cb, ipc_);
 			check_time = timeGetTime();
 		}
@@ -914,7 +914,7 @@ static int init_ipc_server(struct ipc * ipc_){
 			}
 		}
 	}
-	init_ringbuffer((struct ringbuffer *)(ipc_->buffer+get_ringarray_size() + 2 * sizeof(uint)));
+	init_ringbuffer((struct ringbuffer *)(ipc_->buffer + get_ringarray_size() + 2 * sizeof(uint)));
 	sprintf_s(name, PATH_LEN, "event_%ld", ipc_->port);
 	ipc_->evt = CreateSemaphore(NULL, 0, 1, name);
 	if(!ipc_->evt){
@@ -1073,7 +1073,7 @@ static int init_ipc_client(struct ipc * ipc_){
 		}
 		*(int *)(buffer + sizeof(ushort) + sizeof(uint)) = ipc_->client->locate;
 		init_ringbuffer((struct ringbuffer *)(ipc_->buffer + sizeof(uint)));
-		ipc_->client->evt = semget(ipc_->port+0xFFFF, 0, IPC_CREAT|0600);
+		ipc_->client->evt = semget(ipc_->port + 0xFFFF, 0, IPC_CREAT|0600);
 		if(ipc_->client->evt<0){
 			shmdt(ipc_->client->buffer);
 			ipc_->buffer = NULL;
@@ -1242,7 +1242,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 			emc_unlock(&ipc_->lock);
 			return -1;
 		}
-		emc_msg_build(msg_r,msg);
+		emc_msg_build(msg_r, msg);
 		data->ipc_ = ipc_;
 		data->id = emc_msg_getid(msg_r);
 		data->flag = flag;

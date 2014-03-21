@@ -32,10 +32,9 @@
 #include "../src/emc.h"
 
 struct para{
-	int device;
-	int plug;
-	int plug2;
-	int exit;
+	int				device;
+	int				plug;
+	volatile uint	exit;
 };
 
 static emc_cb_t EMC_CALL OnRecvMsg(void *p){
@@ -51,7 +50,6 @@ static emc_cb_t EMC_CALL OnRecvMsg(void *p){
 				emc_msg_set_mode(msg,EMC_REP);
 			}
 			emc_send(plug,msg,0);
-//			emc_send(pa->plug2, msg, 0);
 			emc_msg_free(msg);
 		}
 	}
@@ -89,7 +87,9 @@ int main(int argc, char* argv[]){
 	struct para pa={0};
 	int monitor=1,ch=0;
 	int device=emc_device();
-	int plug = -1, plug2 = -1;
+	int plug = -1;
+	emc_result_t t1,t2,t3,tm;
+
 	pa.exit=0;
 	pa.device = device;
 	emc_set(device,EMC_OPT_MONITOR|EMC_OPT_CONTROL,&monitor,sizeof(int));
@@ -98,17 +98,14 @@ int main(int argc, char* argv[]){
 	printf("Input a port to bind:");
 	scanf("%ld",&ch);
 	plug = emc_plug(device);
-//	plug2 = emc_plug(device);
 	pa.plug = plug;
-//	pa.plug2 = plug2;
 	if(emc_bind(plug,NULL,ch) < 0){
 		printf("emc_bing fail,errno=%d,msg=%s\n",emc_errno(),emc_errno_str(emc_errno()));
 	}
-	emc_thread(OnRecvMsg,(void *)&pa);
-	emc_thread(OnRecvMsg,(void *)&pa);
-	emc_thread(OnRecvMsg,(void *)&pa);
-	emc_thread(OnMonitorDevice,(void *)&pa);
-//	emc_connect(plug2, EMC_REQ, "127.0.0.1", 9002);
+	t1 = emc_thread(OnRecvMsg,(void *)&pa);
+	t2 = emc_thread(OnRecvMsg,(void *)&pa);
+	t3 = emc_thread(OnRecvMsg,(void *)&pa);
+	tm = emc_thread(OnMonitorDevice,(void *)&pa);
 	printf("Input C or c to close a connection,Q or q to exit\n");
 	while(1){
 		ch=getchar();
@@ -124,8 +121,11 @@ int main(int argc, char* argv[]){
 	getchar();
 	pa.exit=1;
 	emc_close(plug);
-//	emc_close(plug2);
 	emc_destory(device);
+	emc_thread_join(t1);
+	emc_thread_join(t2);
+	emc_thread_join(t3);
+	emc_thread_join(tm);
 	getchar();
 	return 0;
 }
