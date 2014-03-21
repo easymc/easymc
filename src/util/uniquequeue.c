@@ -37,7 +37,7 @@
 #pragma pack(1)
 struct uniquenode{
 	int					id;
-	void			*	addition;
+	void				*addition;
 };
 struct uniquequeue{
 	volatile int		ids[UNIQUE_SIZE];

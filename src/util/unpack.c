@@ -37,7 +37,7 @@
 
 #pragma pack(1)
 struct unpack_unit{
-	char			*	buffer;
+	char				*buffer;
 	int					len;
 	struct emc_queue	queue;
 };

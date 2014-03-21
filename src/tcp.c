@@ -60,62 +60,62 @@
 #if defined (EMC_WINDOWS)
 struct tcp_ol{
 	// Overlapping structures
-	OVERLAPPED			ol;
-	WSABUF				buf;
-	int					mask;
-	struct tcp_client * client;
+	OVERLAPPED				ol;
+	WSABUF					buf;
+	int						mask;
+	struct tcp_client		*client;
 };
 #endif
 
 struct tcp_data{
 	//Whether the message deletion(0xdeaddead)
-	volatile uint	flag;
+	volatile uint			flag;
 	// Whether to wait
-	int				wait;
+	int						wait;
 	// Command
-	uchar			cmd;
+	uchar					cmd;
 	// Serial Number
-	uint			serial;
+	uint					serial;
 	// Original length
-	uint			ori;
+	uint					ori;
 	// The actual length of the data
-	uint			len;
+	uint					len;
 	// Do not send out the remaining length
-	volatile uint	lave;
-	void			*msg;
+	volatile uint			lave;
+	void					*msg;
 };
 
 struct tcp_unit{
-	int			wait;
-	struct tcp	*tcp_;
-	void		*msg;
+	int						wait;
+	struct tcp				*tcp_;
+	void					*msg;
 };
 
 // Thread structure
 struct tcp_area{
 	// Number of socket has been connected
-	volatile uint		count;
+	volatile uint			count;
 	// Id send queue
-	struct uniquequeue	*wmq;
+	struct uniquequeue		*wmq;
 #if defined (EMC_WINDOWS)
-	HANDLE				fd;
+	HANDLE					fd;
 #else
-	int					fd;
+	int						fd;
 #endif
 	// Thread
-	emc_result_t		twork;
-	emc_result_t		tsend;
+	emc_result_t			twork;
+	emc_result_t			tsend;
 	// tcp manger
-	struct tcp_mgr	*	mgr;
+	struct tcp_mgr			*mgr;
 };
 
 struct tcp_server{
 	//socket handle
-	int					fd;
+	int						fd;
 	// accept thread
-	emc_result_t		taccept;			
-	struct tcp			*tcp_;
-	struct hashmap		*connection;
+	emc_result_t			taccept;			
+	struct tcp				*tcp_;
+	struct hashmap			*connection;
 };
 
 struct tcp_client{
@@ -140,39 +140,40 @@ struct tcp_client{
 
 struct tcp{
 	//Whether the tcp deletion(0xdeaddead)
-	volatile uint		flag;
+	volatile uint			flag;
 	// plug id
-	int					plug;
+	int						plug;
 	// tcp manger
-	struct tcp_mgr	*	mgr;
+	struct tcp_mgr			*mgr;
 	// tcp type: local / remote
-	int					type;
+	int						type;
 	//ip
-	int					ip;
+	int						ip;
 	//port
-	ushort				port;
+	ushort					port;
 	// Message received task list
-	struct map			*rmap;
-	struct tcp_server	*server;
-	struct tcp_client	*client;
+	struct map				*rmap;
+	struct tcp_server		*server;
+	struct tcp_client		*client;
 	// exit
-	volatile	uint	exit;
+	volatile	uint		exit;
 };
 
 struct tcp_mgr{
 	// Device ID
-	int				device;
-	struct tcp_area	*area;
+	int						device;
+	struct tcp_area			*area;
 	//close lock
-	volatile uint	term_lck;
+	volatile uint			term_lck;
 	// exit
-	volatile uint	exit;
+	volatile uint			exit;
 };
 #pragma pack()
 
 static int init_tcp_client(struct tcp * tcp_);
 static void tcp_send_login(struct tcp * tcp_);
-static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, uchar cmd, int flag, void * msg);
+static int tcp_send_data(struct tcp * tcp_, struct tcp_client * client, 
+	uchar cmd, int flag, void * msg);
 
 //Cas Operate
 static uint tcp_number_cas(volatile uint * key, uint _old, uint _new){
@@ -184,7 +185,7 @@ static uint tcp_number_cas(volatile uint * key, uint _old, uint _new){
 }
 
 static void tcp_number_add(volatile uint * n){
-	do{}while(0!=tcp_number_cas(n, 0, 1));
+	do{}while(0 != tcp_number_cas(n, 0, 1));
 }
 
 static void tcp_number_dec(volatile uint * n){
@@ -225,14 +226,14 @@ static int tcp_set_keepalive(int fd){
 // Gets the minimum number of threads connected
 static struct tcp_area* tcp_least_thread(struct tcp_mgr * mgr){
 	uint index = 0, count = EMC_SOCKETS_DEFAULT, result = 0;
-	for(index=0; index < get_device_thread(mgr->device); index++){
+	for(index = 0; index < get_device_thread(mgr->device); index ++){
 		if(mgr->area[index].count < count){
 			count = mgr->area[index].count;
 			result = index;
 			if(!count) break;
 		}
 	}
-	return mgr->area+result;
+	return mgr->area + result;
 }
 
 static int tcp_add_event(struct tcp_area * area, struct tcp_client * client, uint mask){
@@ -268,7 +269,7 @@ static int tcp_add_event(struct tcp_area * area, struct tcp_client * client, uin
 // Set socket literacy event
 #if defined (EMC_WINDOWS)
 static int tcp_set_event(struct tcp_area * area, struct tcp_client * client, uint mask){
-	unsigned long flag=0, length=0;
+	unsigned long flag = 0, length = 0;
 	if(mask & EMC_READ){
 		memset(&client->olr.ol, 0, sizeof(OVERLAPPED));
 		client->olr.mask = EMC_READ;
@@ -294,9 +295,9 @@ static void tcp_release_msg(struct tcp_data * data){
 	if(EMC_LIVE == data->flag){
 		//Release data
 		data->flag = EMC_DEAD;
-		if(	data->msg && EMC_NOWAIT==data->wait &&
+		if(	data->msg && EMC_NOWAIT == data->wait &&
 			emc_msg_zero_ref(data->msg) > 0 && 
-			emc_msg_serial(data->msg)==data->serial){
+			emc_msg_serial(data->msg) == data->serial){
 			emc_msg_free(data->msg);
 		}
 		data->msg = NULL;
@@ -376,13 +377,14 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 		if(((struct tcp_data_unit *)data)->total <= TCP_DATA_SIZE){
 			if(EMC_CMD_LOGIN == ((struct tcp_data_unit *)data)->cmd){
 				if(EMC_LOCAL == tcp_->type){
-					client->mode = *(ushort *)(data+sizeof(struct tcp_data_unit));
+					client->mode = *(ushort *)(data + sizeof(struct tcp_data_unit));
 					tcp_send_loginback(tcp_, id, client);
 				}else if(EMC_REMOTE == tcp_->type){
 					tcp_number_add(&client->completed);
 				}
 			}else if(EMC_CMD_DATA == ((struct tcp_data_unit *)data)->cmd){
-				struct message * msg = (struct message *)emc_msg_alloc(data+sizeof(struct tcp_data_unit), len-sizeof(struct tcp_data_unit));
+				struct message * msg = (struct message *)emc_msg_alloc(data + sizeof(struct tcp_data_unit),
+					len - sizeof(struct tcp_data_unit));
 				if(msg){
 					emc_msg_setid(msg, id);
 					emc_msg_set_mode(msg, client->mode);
@@ -420,8 +422,8 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 				}
 				merger_init(mg, ((struct tcp_data_unit *)data)->total, packets);
 				merger_add(mg, ((struct tcp_data_unit *)data)->no, 
-					((struct tcp_data_unit *)data)->no * TCP_DATA_SIZE, data+sizeof(struct tcp_data_unit), 
-					len-sizeof(struct tcp_data_unit));
+					((struct tcp_data_unit *)data)->no * TCP_DATA_SIZE, data + sizeof(struct tcp_data_unit), 
+					len - sizeof(struct tcp_data_unit));
 				if(0 == merger_get(mg, tcp_merger_cb, id, tcp_)){
 					global_free_merger(mg);
 					map_erase(tcp_->rmap, serial.no);
@@ -610,7 +612,7 @@ static int tcp_data_sep(struct tcp_data * data, char * buffer, int id){
 	((struct tcp_data_unit *)(buffer + sizeof(uint)))->serial = data->serial;
 	((struct tcp_data_unit *)(buffer + sizeof(uint)))->total = data->len;
 	((struct tcp_data_unit *)(buffer + sizeof(uint)))->no = (data->len-data->lave)/TCP_DATA_SIZE;
-	memcpy(buffer + sizeof(uint) + sizeof(struct tcp_data_unit), (char *)emc_msg_buffer(data->msg) + (data->len-data->lave),
+	memcpy(buffer + sizeof(uint) + sizeof(struct tcp_data_unit), (char *)emc_msg_buffer(data->msg) + (data->len - data->lave),
 		data->lave > TCP_DATA_SIZE?TCP_DATA_SIZE:data->lave);
 	return data->lave > TCP_DATA_SIZE?MAX_PROTOCOL_SIZE:(data->lave + sizeof(struct tcp_data_unit) + sizeof(uint));
 }
@@ -799,7 +801,7 @@ static emc_cb_t EMC_CALL tcp_work_cb(void * args){
 		retval = epoll_wait(area->fd, events, TCP_FD_SIZE, 1);
 		if(retval > 0){
 			int j = 0;
-			for (j = 0; j < retval; j++){
+			for (j = 0; j < retval; j ++){
 				id = ((struct tcp_client *)events[j].data.ptr)->id;
 				if(id >= 0 && id < EMC_SOCKETS_DEFAULT){
 					if(events[j].events & EPOLLIN){
@@ -1032,7 +1034,7 @@ static int init_tcp_client(struct tcp * tcp_){
 }
 
 // Initialize tcp manager
-int init_tcp_mgr(struct tcp_mgr *mgr, int thread){
+static int init_tcp_mgr(struct tcp_mgr * mgr, int thread){
 	int index = 0;
 
 	if(thread <= 0){

@@ -37,21 +37,21 @@
 #pragma pack(1)
 struct merger_unit{
 	// Data pointer
-	char			  * data;
+	char					*data;
 	// Total length
-	int					total;
+	int						total;
 	// Packets
-	int					packets;
+	int						packets;
 	// Length has been received
-	int					len;
+	int						len;
 	// The last time the data is received
-	volatile uint		time;
+	volatile uint			time;
 
-	struct emc_queue	queue;
+	struct emc_queue		queue;
 };
 
 struct merger{
-	struct merger_unit	*	units;
+	struct merger_unit		*units;
 	struct emc_queue		idle;
 	// Represents the number of units assigned to the elements
 	volatile uint			count;

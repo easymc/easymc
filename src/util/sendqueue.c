@@ -36,13 +36,13 @@
 
 #pragma pack(1)
 struct sendqueue_unit{
-	void				*data;
-	struct emc_queue	queue;
+	void						*data;
+	struct emc_queue			queue;
 };
 
 struct sendqueue{
 	struct emc_queue			ids[EMC_SOCKETS_DEFAULT];
-	struct sendqueue_unit	  * units[SQ_DEFAULT_SIZE];
+	struct sendqueue_unit		*units[SQ_DEFAULT_SIZE];
 	struct emc_queue			idle;
 	uint						total;
 	volatile uint				lock;                    

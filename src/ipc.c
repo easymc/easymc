@@ -34,6 +34,7 @@
 #include "util/ringqueue.h"
 #include "util/ringbuffer.h"
 #include "util/ringarray.h"
+#include "util/lock.h"
 #include "global.h"
 #include "common.h"
 #include "device.h"
@@ -53,39 +54,39 @@
 #define IPC_CHECK_TIMEOUT	(30000)
 
 struct ipc_server{
-	struct map	*connection;
+	struct map			*connection;
 };
 
 struct ipc_client{
 	// Server-assigned id
-	int				id;
+	int					id;
 	// Communication mode
-	ushort			mode;
+	ushort				mode;
 	// Locally assigned id, for reconnection
-	int				inid;
+	int					inid;
 	// Serial connection
-	int				locate;
+	int					locate;
 	// Are already connected
-	volatile uint	connected;
+	volatile uint		connected;
 	// Last received data time 
-	volatile uint	time;
+	volatile uint		time;
 
-	uint			evt_flag;
+	uint				evt_flag;
 	// Transfer Handle
 #if defined (EMC_WINDOWS)
-	HANDLE			evt;
+	HANDLE				evt;
 #else
-	int				evt;
+	int					evt;
 #endif
 	// Shared memory buffer address
-	char			*buffer;
+	char				*buffer;
 };
 
 struct ipc_data{
-	int			id;
-	int			flag;
-	struct ipc	*ipc_;
-	void		*msg;
+	int					id;
+	int					flag;
+	struct ipc			*ipc_;
+	void				*msg;
 };
 
 struct ipc{
@@ -113,18 +114,20 @@ struct ipc{
 	emc_result_t		twork;
 	emc_result_t		tcheck;
 	emc_result_t		tsend;
-
-	volatile	uint	exit;
+	//send data lock
+	volatile uint		lock;
+	volatile uint		exit;
 	// Message received task list
 	struct map			*rmap;
 	// Send queue
 	struct ringqueue	*sq;
-	struct	ipc_server	*server;
-	struct	ipc_client	*client;
+	struct ipc_server	*server;
+	struct ipc_client	*client;
 	struct ipc_client	*reconnect;
 };
 
-static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client, int id, ushort cmd, char * data, int length);
+static int write_ipc_data(struct ipc * ipc_, struct ipc_client * client,
+	int id, ushort cmd, char * data, int length);
 static int reopen_ipc(struct ipc * ipc_);
 
 static int ipc_read_wait(struct ipc * ipc_){
@@ -228,24 +231,24 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 			if(client){
 				client->mode = mode;
 				client->id = global_get_connect_id();
-				client->evt_flag = *(uint *)(data+sizeof(ushort));
+				client->evt_flag = *(uint *)(data + sizeof(ushort));
 #if defined (EMC_WINDOWS)
-				sprintf_s(name, PATH_LEN, "event_%ld_%ld", ipc_->port, *(uint *)(data+sizeof(ushort)));
-				client->evt = OpenSemaphore(SEMAPHORE_ALL_ACCESS,TRUE,name);
+				sprintf_s(name, PATH_LEN, "event_%ld_%ld", ipc_->port, *(uint *)(data + sizeof(ushort)));
+				client->evt = OpenSemaphore(SEMAPHORE_ALL_ACCESS, TRUE, name);
 				if(!client->evt){
 					global_idle_connect_id(client->id);
 					free(client);
 					return;
 				}
 #else
-				client->evt = semget(*(uint *)(data+sizeof(ushort)),0,IPC_CREAT|0600);
+				client->evt = semget(*(uint *)(data + sizeof(ushort)), 0, IPC_CREAT|0600);
 				if(client->evt<0){
 					global_idle_connect_id(client->id);
 					free(client);
 					return ;
 				}
 #endif
-				client->locate = *(int *)(data+sizeof(ushort)+sizeof(uint));
+				client->locate = *(int *)(data + sizeof(ushort) + sizeof(uint));
 				if(client->locate < 0 || client->locate >= IPC_MAX_REMOTE){
 #if defined (EMC_WINDOWS)
 					CloseHandle(client->evt);
@@ -254,7 +257,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 #endif
 					return;
 				}
-				client->buffer = ipc_->buffer+sizeof(uint)+get_ringarray_size()+(client->locate+1)*IPC_PEER_SIZE;
+				client->buffer = ipc_->buffer + sizeof(uint) + get_ringarray_size() + (client->locate + 1) * IPC_PEER_SIZE;
 				// Send to respond to the client
 				if(ipc_send_register_bc(ipc_, client) < 0){
 					global_idle_connect_id(client->id);
@@ -472,8 +475,8 @@ static int reopen_ipc(struct ipc * ipc_){
 		if(ipc_->buffer){
 			*(uint *)ipc_->buffer = timeGetTime();
 		}
-		*(int *)(buffer+sizeof(ushort)+sizeof(uint)) = ipc_->client->locate;
-		init_ringbuffer((struct ringbuffer *)(ipc_->buffer+sizeof(uint)));
+		*(int *)(buffer + sizeof(ushort) + sizeof(uint)) = ipc_->client->locate;
+		init_ringbuffer((struct ringbuffer *)(ipc_->buffer + sizeof(uint)));
 #else
 		if(ipc_->client->id >= 0){
 			// If you set the monitor to throw on disconnect events
@@ -513,7 +516,7 @@ static int reopen_ipc(struct ipc * ipc_){
 				ipc_->fd = -1;
 				return -1;
 			}
-			ipc_->buffer = ipc_->buffer + sizeof(uint) + get_ringarray_size() + IPC_PEER_SIZE * (ipc_->client->locate+1);
+			ipc_->buffer = ipc_->buffer + sizeof(uint) + get_ringarray_size() + IPC_PEER_SIZE * (ipc_->client->locate + 1);
 		}
 		ipc_->client->evt = semget(ipc_->port+0xFFFF, 0, IPC_CREAT|0600);
 		if(ipc_->client->evt<0){
@@ -522,13 +525,13 @@ static int reopen_ipc(struct ipc * ipc_){
 		if(ipc_->buffer){
 			*(uint *)ipc_->buffer = timeGetTime();
 		}
-		*(int *)(buffer+sizeof(ushort)+sizeof(uint)) = ipc_->client->locate;
-		init_ringbuffer((struct ringbuffer *)(ipc_->buffer+sizeof(uint)));
+		*(int *)(buffer + sizeof(ushort) + sizeof(uint)) = ipc_->client->locate;
+		init_ringbuffer((struct ringbuffer *)(ipc_->buffer + sizeof(uint)));
 #endif
 		// Login packet sent to the server
 		*(ushort *)buffer = ipc_->client->mode;
-		*(uint *)(buffer+sizeof(ushort)) = ipc_->client->evt_flag;
-		*(int *)(buffer+sizeof(ushort)+sizeof(uint)) = ipc_->client->locate;
+		*(uint *)(buffer + sizeof(ushort)) = ipc_->client->evt_flag;
+		*(int *)(buffer + sizeof(ushort) + sizeof(uint)) = ipc_->client->locate;
 		if(ipc_send_register(ipc_, buffer, 2 * sizeof(uint) + sizeof(ushort)) < 0){
 			return -1;
 		}
@@ -538,7 +541,7 @@ static int reopen_ipc(struct ipc * ipc_){
 
 static int process_ipc_data(struct ipc * ipc_, char * data){
 	if(((struct ipc_data_unit *)data)->total <= IPC_DATA_SIZE){
-		ipc_complete_data(ipc_, ((struct ipc_data_unit *)data)->id, ((struct ipc_data_unit *)data)->cmd, data+sizeof(struct ipc_data_unit),
+		ipc_complete_data(ipc_, ((struct ipc_data_unit *)data)->id, ((struct ipc_data_unit *)data)->cmd, data + sizeof(struct ipc_data_unit),
 			((struct ipc_data_unit *)data)->total);
 	}else{
 		int packets = 0;
@@ -759,7 +762,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 	
 	if(!client->connected) return 0;
 	timeout = *(uint *)client->buffer;
-	timeout = timeGetTime()-timeout;
+	timeout = timeGetTime() - timeout;
 	if(timeout > IPC_TIMEOUT){
 		if(timeGetTime()-client->time > IPC_TIMEOUT){
 			// If you set the monitor to throw on disconnect events
@@ -784,7 +787,7 @@ static uint map_foreach_check_cb(struct map * m, int64 key, void * p, void * add
 }
 
 static uint map_foreach_task_cb(struct map * m, int64 key, void * p, void * addition){
-	if(timeGetTime()-merger_time(p) > IPC_TASK_TIMEOUT){
+	if(timeGetTime() - merger_time(p) > IPC_TASK_TIMEOUT){
 		if(0 == map_erase(m, key)){
 			global_free_merger(p);
 			return 1;
@@ -906,7 +909,7 @@ static int init_ipc_server(struct ipc * ipc_){
 		if(ERROR_ALREADY_EXISTS != GetLastError()){
 			memset(ipc_->buffer, 0, IPC_BUFFER_SIZE);
 			init_ringarray((struct ringarray *)(ipc_->buffer + sizeof(uint)));
-			for(index=0; index<IPC_MAX_REMOTE; index++){
+			for(index = 0; index < IPC_MAX_REMOTE; index ++){
 				push_ringarray((struct ringarray *)(ipc_->buffer + sizeof(uint)), index);
 			}
 		}
@@ -944,7 +947,7 @@ static int init_ipc_server(struct ipc * ipc_){
 		}
 	}
 	init_ringbuffer((struct ringbuffer *)(ipc_->buffer + get_ringarray_size() + 2 * sizeof(uint)));
-	ipc_->evt = semget(ipc_->port+0xFFFF, 1, IPC_CREAT|0600);
+	ipc_->evt = semget(ipc_->port + 0xFFFF, 1, IPC_CREAT|0600);
 	if(ipc_->evt<0){
 		shmdt(ipc_->buffer);
 		shmctl(ipc_->fd, IPC_RMID, NULL);
@@ -1168,7 +1171,7 @@ void delete_ipc(struct ipc * ipc_){
 			delete_map(ipc_->server->connection);
 			free(ipc_->server);
 		}else if(EMC_REMOTE == ipc_->type){
-			write_ipc_data(ipc_, ipc_->client, ipc_->client->id, EMC_CMD_LOGOUT,NULL, 0);
+			write_ipc_data(ipc_, ipc_->client, ipc_->client->id, EMC_CMD_LOGOUT, NULL, 0);
 			term_ipc(ipc_);
 			free(ipc_->client);
 		}
@@ -1208,12 +1211,14 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		errno = EINVAL;
 		return -1;
 	}
+	emc_lock(&ipc_->lock);
 	switch(emc_msg_get_mode(msg)){
 	case EMC_SUB:
 	case EMC_REQ:
 		if(EMC_REMOTE == ipc_->type){
 			if(!ipc_->client->connected) {
 				errno = ENOLIVE;
+				emc_unlock(&ipc_->lock);
 				return -1;
 			}
 			emc_msg_setid(msg, ipc_->client->id);
@@ -1225,11 +1230,16 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 		struct ipc_data * data = NULL;
 		
 		data = (struct ipc_data *)malloc(sizeof(struct ipc_data));
-		if(!data) return -1;
+		if(!data) {
+			errno = ENOMEM;
+			emc_unlock(&ipc_->lock);
+			return -1;
+		}
 		msg_r = emc_msg_alloc(emc_msg_buffer(msg), emc_msg_length(msg));
 		if(!msg_r){
 			free(data);
 			errno = ENOMEM;
+			emc_unlock(&ipc_->lock);
 			return -1;
 		}
 		emc_msg_build(msg_r,msg);
@@ -1243,6 +1253,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 				free(data);
 				emc_msg_free(msg_r);
 				errno = EQUEUE;
+				emc_unlock(&ipc_->lock);
 				return -1;
 			}
 		}else{
@@ -1257,6 +1268,7 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 			if(EMC_PUB != emc_msg_get_mode(msg)){
 				emc_msg_ref_dec(msg);
 			}
+			emc_unlock(&ipc_->lock);
 			return -1;
 		}
 		if(EMC_PUB == emc_msg_get_mode(msg)){
@@ -1267,5 +1279,6 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 			emc_msg_ref_dec(msg);
 		}
 	}
+	emc_unlock(&ipc_->lock);
 	return 0;
 }
