@@ -70,7 +70,7 @@ int emc_device(void){
 		errno = ENOMEM;
 		return -1;
 	}
-	ed->plug_map = hashmap_new(EMC_SOCKETS_DEFAULT);;
+	ed->plug_map = hashmap_new(EMC_MAX_PLUG);
 	id = global_add_device(ed);
 	if(id < 0){
 		delete_ringqueue(ed->mmq);

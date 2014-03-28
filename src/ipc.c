@@ -1150,7 +1150,7 @@ struct ipc * create_ipc(uint ip, ushort port, int device, int plug, unsigned sho
 		}
 	}
 	ipc_->sq = create_ringqueue(_RQ_M);
-	ipc_->rmap = create_map(EMC_SOCKETS_DEFAULT);
+	ipc_->rmap = create_map(IPC_MAX_REMOTE << 3);
 	ipc_->twork = emc_thread(ipc_work_cb, ipc_);
 	ipc_->tcheck = emc_thread(ipc_check_cb, ipc_);
 	ipc_->tsend = emc_thread(ipc_send_cb, ipc_);

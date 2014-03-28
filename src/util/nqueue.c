@@ -38,11 +38,10 @@
 #pragma pack(1)
 struct nqueue
 {
-	 
 	 int						ids[EMC_SOCKETS_DEFAULT];
 	 unsigned int				used;
 	 unsigned int				size;
-	 volatile unsigned int		lock;                    
+	 volatile unsigned int		lock;
 };
 #pragma pack()
 

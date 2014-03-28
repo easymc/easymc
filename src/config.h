@@ -96,7 +96,8 @@
 #endif
 
 // The maximum number of supported socket
-#define EMC_SOCKETS_DEFAULT 0x4000
+#define EMC_SOCKETS_DEFAULT 0x10000
+#define EMC_MAX_PLUG	0x4000
 
 // Server mode
 #define EMC_NONE	 0

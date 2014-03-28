@@ -115,15 +115,15 @@ static void global_init(void){
 		WSAStartup(MAKEWORD(2, 2), &wsaData);
 #endif
 		self.devices = hashmap_new(GLOBAL_DEVICE_DEFAULT);
-		self.plugs = hashmap_new(EMC_SOCKETS_DEFAULT);
+		self.plugs = hashmap_new(EMC_MAX_PLUG);
 		self.mg = merger_new(EMC_SOCKETS_DEFAULT);
 		self.upk = unpack_new(EMC_SOCKETS_DEFAULT);
 		self.id_allocator = create_nqueue();
-		for(index=0; index<EMC_SOCKETS_DEFAULT; index++){
+		for(index = 0; index < EMC_SOCKETS_DEFAULT; index ++){
 			nqueue_push(self.id_allocator, index);
 		}
 		self.sq = create_sendqueue();
-		self.rcmq = create_map(EMC_SOCKETS_DEFAULT);
+		self.rcmq = create_map(EMC_MAX_PLUG);
 		srand((uint)time(NULL));
 		self.treconnect = emc_thread(global_reconnect_cb, NULL);
 	}
@@ -162,13 +162,13 @@ int global_add_device(void * device_){
 void * global_get_device(int id){
 	if(id < 0) return NULL;
 	global_init();
-	return hashmap_search(self.devices,id);
+	return hashmap_search(self.devices, id);
 }
 
 void global_erase_device(int id){
 	if(id >= 0 && id < GLOBAL_DEVICE_DEFAULT){
 		global_init();
-		hashmap_erase(self.devices,id);
+		hashmap_erase(self.devices, id);
 	}
 }
 
@@ -185,13 +185,13 @@ int global_add_plug(void * plug){
 void * global_get_plug(int id){
 	if(id < 0) return NULL;
 	global_init();
-	return hashmap_search(self.plugs,id);
+	return hashmap_search(self.plugs, id);
 }
 
 void global_erase_plug(int id){
 	if(id >= 0 && id < GLOBAL_DEVICE_DEFAULT){
 		global_init();
-		hashmap_erase(self.plugs,id);
+		hashmap_erase(self.plugs, id);
 	}
 }
 
