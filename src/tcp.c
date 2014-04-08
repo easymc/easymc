@@ -331,7 +331,7 @@ static void tcp_send_loginback(struct tcp * tcp_, int id, struct tcp_client * cl
 	void * msg = emc_msg_alloc(NULL, sizeof(ushort));
 	emc_msg_setid(msg, id);
 	*(ushort *)emc_msg_buffer(msg) = client->mode;
-	if(tcp_send_data(tcp_,client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
+	if(tcp_send_data(tcp_, client, EMC_CMD_LOGIN, EMC_NOWAIT, msg) < 0){
 		emc_msg_free(msg);
 	}
 }

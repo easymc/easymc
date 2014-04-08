@@ -956,7 +956,7 @@ static int init_ipc_server(struct ipc * ipc_){
 		return -1;
 	}
 #endif
-	ipc_->server->connection = create_map(EMC_SOCKETS_DEFAULT);
+	ipc_->server->connection = create_map(IPC_MAX_REMOTE);
 	return 0;
 }
 
@@ -1041,7 +1041,7 @@ static int init_ipc_client(struct ipc * ipc_){
 	// Try to open server shared memory
 	ipc_->fd = shmget(ipc_->port, 0, IPC_CREAT|0666);
 	if(ipc_->fd >= 0){
-		ipc_->client->buffer = ipc_->buffer=(char *)shmat(ipc_->fd, NULL, 0);
+		ipc_->client->buffer = ipc_->buffer = (char *)shmat(ipc_->fd, NULL, 0);
 		if(!ipc_->buffer){
 			shmdt(ipc_->buffer);
 			ipc_->buffer = NULL;
