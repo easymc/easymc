@@ -709,6 +709,8 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 			errno = EMODE;
 			return -1;
 		}
+	}else if(EMC_REMOTE == ipc_->type){
+		emc_msg_set_mode(ipc_->client->mode);
 	}
 	switch(emc_msg_get_mode(msg)){
 	case EMC_REQ:
