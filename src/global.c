@@ -64,6 +64,7 @@ struct global{
 	struct map			*rcmq;
 	// reconnect thread
 	emc_result_t		treconnect;
+	volatile uint		initialized;
 	// exit
 	volatile uint		exit;
 };
@@ -109,7 +110,7 @@ static uint global_number_next(volatile uint * v){
 
 static void global_init(void){
 	int index = 0;
-	if(!self.devices){
+	if(!self.initialized){
 #if defined (EMC_WINDOWS)
 		WSADATA	wsaData = {0};
 		WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -126,6 +127,7 @@ static void global_init(void){
 		self.rcmq = create_map(EMC_MAX_PLUG);
 		srand((uint)time(NULL));
 		self.treconnect = emc_thread(global_reconnect_cb, NULL);
+		self.initialized = 1;
 	}
 }
 
