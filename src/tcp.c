@@ -381,6 +381,7 @@ static void tcp_unpack_cb(char * data, unsigned short len, int id, void * args){
 					tcp_send_loginback(tcp_, id, client);
 				}else if(EMC_REMOTE == tcp_->type){
 					tcp_number_add(&client->completed);
+					tcp_post_monitor(tcp_, client, EMC_EVENT_CONNECT, NULL);
 				}
 			}else if(EMC_CMD_DATA == ((struct tcp_data_unit *)data)->cmd){
 				struct message * msg = (struct message *)emc_msg_alloc(data + sizeof(struct tcp_data_unit),
@@ -1029,7 +1030,6 @@ static int init_tcp_client(struct tcp * tcp_){
 	}
 	strncpy(tcp_->client->ip, inet_ntoa(addr.sin_addr), ADDR_LEN);
 	tcp_->client->port = ntohs(addr.sin_port);
-	tcp_post_monitor(tcp_, tcp_->client, EMC_EVENT_CONNECT, NULL);
 	return 0;
 }
 
