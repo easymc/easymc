@@ -112,6 +112,8 @@ struct tcp_area{
 struct tcp_server{
 	//socket handle
 	int						fd;
+	// Whether in publishing
+	volatile uint			pub;
 	// accept thread
 	emc_result_t			taccept;			
 	struct tcp				*tcp_;
@@ -483,6 +485,11 @@ static int process_close(struct tcp * tcp_, struct tcp_area * area, int id){
 	void * msg = NULL;
 
 	if(EMC_LIVE != tcp_->flag) return -1;
+	if(EMC_LOCAL == tcp_->type){
+		while(tcp_->server->pub){
+			nsleep(1);
+		}
+	}
 	emc_lock(&tcp_->mgr->term_lck);
 	if(EMC_LOCAL == tcp_->type){
 		client = (struct tcp_client *)hashmap_search(tcp_->server->connection, id);
@@ -1270,9 +1277,19 @@ int send_tcp(struct tcp * tcp_, void * msg, int flag){
 				}
 				emc_msg_build(msg_r, msg);
 				unit.msg = msg_r;
+				while(tcp_->mgr->term_lck){
+					nsleep(1);
+				}
+				emc_lock(&tcp_->server->pub);
 				hashmap_foreach(tcp_->server->connection, tcp_pub_foreach_cb, &unit);
+				emc_unlock(&tcp_->server->pub);
 			}else{
+				while(tcp_->mgr->term_lck){
+					nsleep(1);
+				}
+				emc_lock(&tcp_->server->pub);
 				hashmap_foreach(tcp_->server->connection, tcp_pub_foreach_cb, &unit);
+				emc_unlock(&tcp_->server->pub);
 				while(0 == emc_msg_zero_ref(msg)){}
 			}
 		}

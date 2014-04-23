@@ -54,6 +54,10 @@
 #define IPC_CHECK_TIMEOUT	(30000)
 
 struct ipc_server{
+	// close ipc lock
+	volatile uint		term_lock;
+	// publish data lock
+	volatile uint		pub_lock;
 	struct map			*connection;
 };
 
@@ -300,6 +304,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 		if(EMC_LOCAL == ipc_->type){
 			if(0 == map_get(ipc_->server->connection, id, (void **)&client)){
 				client->connected = 0;
+				emc_lock(&ipc_->server->term_lock);
 				map_foreach(ipc_->rmap, ipc_tq_foreach_cb, client);
 				// If you set the monitor to throw on disconnect events
 				ipc_post_monitor(ipc_, client, (int)client->evt, EMC_EVENT_CLOSED, NULL);
@@ -317,6 +322,7 @@ static void ipc_complete_data(struct ipc * ipc_, int id, ushort cmd, char * data
 					global_idle_connect_id(id);
 					free(client);
 				}
+				emc_unlock(&ipc_->server->term_lock);
 			}
 		}else if(EMC_REMOTE == ipc_->type){
 			ipc_->client->connected = 0;
@@ -710,7 +716,7 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 			return -1;
 		}
 	}else if(EMC_REMOTE == ipc_->type){
-		emc_msg_set_mode(ipc_->client->mode);
+		emc_msg_set_mode(msg, ipc_->client->mode);
 	}
 	switch(emc_msg_get_mode(msg)){
 	case EMC_REQ:
@@ -745,7 +751,12 @@ static int write_ipc(struct ipc * ipc_, void * msg, int flag){
 	case EMC_PUB:
 		{
 			struct ipc_data unit = {0, flag, ipc_, msg};
+			while(ipc_->server->term_lock){
+				nsleep(1);
+			}
+			emc_lock(&ipc_->server->pub_lock);
 			map_foreach(ipc_->server->connection, ipc_send_pub_foreach_cb, &unit);
+			emc_unlock(&ipc_->server->pub_lock);
 		}
 		break;
 	}
@@ -1260,7 +1271,12 @@ int send_ipc(struct ipc * ipc_, void * msg, int flag){
 			}
 		}else{
 			struct ipc_data unit = {0, flag, ipc_, msg_r};
+			while(ipc_->server->term_lock){
+				nsleep(1);
+			}
+			emc_lock(&ipc_->server->pub_lock);
 			map_foreach(ipc_->server->connection, ipc_send_pub_foreach_cb, &unit);
+			emc_unlock(&ipc_->server->pub_lock);
 		}
 	}else{
 		if(EMC_PUB != emc_msg_get_mode(msg)){
