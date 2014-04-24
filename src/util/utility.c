@@ -32,15 +32,11 @@
 #include "utility.h"
 
 
-#if !defined (EMC_WINDOWS)
-unsigned int timeGetTime(){
-	unsigned int uptime = 0;
-	struct timespec on;
-	if(clock_gettime(CLOCK_MONOTONIC, &on) == 0)
-		uptime = on.tv_sec*1000 + on.tv_nsec/1000000;
-	return uptime;
+int64 time_get_time(){
+	struct timeb ts = {0};
+	ftime(&ts);
+	return (ts.time * 1000 + ts.millitm);
 }
-#endif
 
 emc_result_t emc_thread(emc_thread_cb * cb, void * args){
 	thread_t thrd = 0;

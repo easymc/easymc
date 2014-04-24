@@ -33,9 +33,8 @@
 extern "C" {
 #endif
 
-#if !defined (EMC_WINDOWS)
-	unsigned int timeGetTime();
-#endif
+	int64 time_get_time();
+
 	unsigned int get_thread_id();
 
 	unsigned int check_local_machine(int ip);

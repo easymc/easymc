@@ -34,7 +34,6 @@
 #include <windows.h>
 #include <time.h>
 #include <memory.h>
-#include <mmsystem.h>
 #else
 #include <pthread.h>
 #include <sys/time.h>
@@ -58,6 +57,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <sys/stat.h>
+#include <sys/timeb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>

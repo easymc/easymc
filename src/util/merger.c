@@ -28,6 +28,7 @@
 
 #include "../config.h"
 #include "../emc.h"
+#include "utility.h"
 #include "merger.h"
 #include "queue.h"
 #include "lock.h"
@@ -45,7 +46,7 @@ struct merger_unit{
 	// Length has been received
 	int						len;
 	// The last time the data is received
-	volatile uint			time;
+	volatile int64			time;
 
 	struct emc_queue		queue;
 };
@@ -115,7 +116,7 @@ void merger_init(void * block, int len, int packets){
 	}
 	unit->packets = packets;
 	unit->total = len;
-	unit->time = timeGetTime();
+	unit->time = time_get_time();
 }
 
 int merger_add(void * block, int no, int start, char * data, int len){
@@ -126,7 +127,7 @@ int merger_add(void * block, int no, int start, char * data, int len){
 		unit->len += len;
 		*(int *)(unit->data + (no * sizeof(int))) = 1;
 	}
-	unit->time = timeGetTime();
+	unit->time = time_get_time();
 	return len;
 }
 
@@ -147,7 +148,7 @@ int merger_get(void * block, merger_get_cb * cb, int id, void * addition){
 	return -1;
 }
 
-uint merger_time(void * block){
+int64 merger_time(void * block){
 	return ((struct merger_unit *)block)->time;
 }
 

@@ -30,7 +30,7 @@ set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_COMPILER_IS_GNUCC)
-	set (CMAKE_C_FLAGS "-o2 -march=i486")
+	set (CMAKE_C_FLAGS "-g -o2 -march=i486")
 endif ()
 
 set (	EMC_SOURCES
@@ -82,7 +82,7 @@ set (	EMC_SOURCES
 
 add_library (easymc SHARED ${EMC_SOURCES})
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	target_link_libraries (easymc ws2_32 winmm)
+	target_link_libraries (easymc ws2_32)
 else ()
 	target_link_libraries (easymc pthread rt)
 endif ()

@@ -56,7 +56,7 @@ int merger_add(void * block, int no, int start, char * data, int len);
 // For a complete packet from the block, the data returned by the callback function
 int merger_get(void * block, merger_get_cb * cb, int id, void * addition);
 // Gets the last time the data received from the block
-unsigned int merger_time(void * block);
+int64 merger_time(void * block);
 // Release has finished using the Block
 void merger_free(struct merger * un, void * block);
 
