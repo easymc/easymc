@@ -35,26 +35,26 @@
 // Packet protocol
 struct ipc_data_unit{
 	// Command
-	uchar	cmd;
+	uchar		cmd;
 	// The number of clients receiving the data
-	int		id;
+	int			id;
 	// Data unique serial number
-	int		serial;
+	int			serial;
 	// The total length
-	int		total;
+	int			total;
 	// The packet sequence number
-	int		no;
+	int			no;
 };
 
 struct tcp_data_unit{
 	// Command
-	uchar	cmd;
+	uchar		cmd;
 	// Data unique serial number
-	int		serial;
+	int			serial;
 	// The total length
-	int		total;
+	int			total;
 	// The packet sequence number
-	int		no;
+	int			no;
 };
 
 // Serial number
@@ -71,11 +71,11 @@ union data_serial{
 // Reconnection data structure
 struct reconnect{
 	//callback function
-	void	*cb;		
+	void		*cb;		
 	// Reconnect the client's pointer
-	void	*client;
+	void		*client;
 	// Additional data
-	void	*addition;
+	void		*addition;
 };
 #pragma pack()
 
