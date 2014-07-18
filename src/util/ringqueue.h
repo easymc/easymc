@@ -78,9 +78,19 @@ extern "C"{
 	* Input: struct ringqueue pointer
 	* Output: N/A
 	* Return: 0 success£¬1 timeout£¬-1 failure
-	* Remark: N/A
+	* Remark: for multiple mode
 	***************************************************************************/
 	int wait_ringqueue(struct ringqueue *);
+
+	/**************************************************************************
+	* Name: wait_ringqueue_single
+	* Function: Wait ringqueue written inside the success event
+	* Input: struct ringqueue pointer
+	* Output: N/A
+	* Return: 0 success£¬1 timeout£¬-1 failure
+	* Remark: for single mode
+	***************************************************************************/
+	int wait_ringqueue_single(struct ringqueue *, int);
 
 	/**************************************************************************
 	* Name: post_ringqueue

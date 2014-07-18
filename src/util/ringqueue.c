@@ -39,6 +39,12 @@
 #define _RQ_CONSUMER (1024)
 
 #pragma pack(1)
+//sigle consumer
+struct single_consumer{
+	volatile int	cursor;
+	struct event	*wait;
+};
+
 // Producer
 struct producer{
 	// State flag
@@ -55,17 +61,17 @@ struct consumer{
 	volatile int	cursor;
 };
 struct ringqueue{
-	uchar				mode;
-	void				*node[_RQ_SIZE];
+	uchar							mode;
+	void							*node[_RQ_SIZE];
 	// Point to the next available element ringqueue cursor
-	volatile int		cursor;
-	struct producer		pd;
+	volatile int					cursor;
+	struct producer					pd;
 	// consumers
-	volatile int		cs[_RQ_CONSUMER];
-	volatile int		count;
+	volatile struct single_consumer	cs[_RQ_CONSUMER];
+	volatile int					count;
 	// Multi-threaded shared consumers
-	struct consumer		mcs;
-	struct event		*wait;
+	struct consumer					mcs;
+	struct event					*wait;
 };
 #pragma pack()
 
@@ -115,8 +121,8 @@ static uint ringqueue_check_consumer(struct ringqueue * rb){
 	int index = 0;
 	if(_RQ_S == rb->mode){
 		for(index = 0; index < rb->count; index ++){
-			if(get_int_volatitle(&rb->pd.cursor, 0) >= get_int_volatitle(rb->cs, index)){
-				if(get_int_volatitle(&rb->pd.cursor, 0) - get_int_volatitle(rb->cs, index) + 1 >= _RQ_SIZE){
+			if(get_int_volatitle(&rb->pd.cursor, 0) >= get_int_volatitle(&rb->cs[index].cursor, 0)){
+				if(get_int_volatitle(&rb->pd.cursor, 0) - get_int_volatitle(&rb->cs[index].cursor, 0) + 1 >= _RQ_SIZE){
 					return 1;
 				}
 			}
@@ -148,14 +154,21 @@ struct ringqueue * create_ringqueue(uchar mode){
 		rb->mcs.mark[index] = -1;
 	}
 	for(index = 0; index < _RQ_CONSUMER; index ++){
-		rb->cs[index] = -1;
+		rb->cs[index].cursor = -1;
 	}
 	rb->wait = create_event();
 	return rb;
 }
 
 void delete_ringqueue(struct ringqueue * rb){
+	int index = 0;
 	delete_event(rb->wait);
+	for(; index < rb->count; index ++){
+		if(rb->cs[index].wait){
+			delete_event(rb->cs[index].wait);
+			rb->cs[index].wait = NULL;
+		}
+	}
 	free(rb);
 }
 
@@ -165,11 +178,18 @@ int get_single_consumer(struct ringqueue * rb){
 		cursor = rb->count;
 		next = cursor+1;
 	}while(cursor != ringqueue_number_cas(&rb->count, cursor, next));
+	if(!rb->cs[next].wait){
+		rb->cs[next].wait = create_event();
+	}
 	return next;
 }
 
 int wait_ringqueue(struct ringqueue * rb){
 	return wait_event(rb->wait, -1);
+}
+
+int wait_ringqueue_single(struct ringqueue * rb, int index){
+	return wait_event(rb->cs[index].wait, -1);
 }
 
 int post_ringqueue(struct ringqueue * rb){
@@ -192,17 +212,23 @@ int push_ringqueue(struct ringqueue * rb, void * p){
 			}
 		}
 	}while(1);
-	post_event(rb->wait);
+	if(_RQ_S == rb->mode){
+		for(index = 0; index < rb->count; index ++){
+			post_event(rb->cs[index].wait);
+		}
+	}else if(_RQ_M == rb->mode){
+		post_event(rb->wait);
+	}
 	return 0;
 }
 
 int pop_ringqueue_single(struct ringqueue * rb, int index, void ** p){
 	uint current = -1, cursor = -1;
-	if(rb->cursor == rb->cs[index]) return -1;
+	if(rb->cursor == rb->cs[index].cursor) return -1;
 	do{
-		current = get_int_volatitle(rb->cs, index);
+		current = get_int_volatitle(&rb->cs[index].cursor, 0);
 		cursor = current + 1;
-	}while(current != ringqueue_number_cas(&rb->cs[index], current, cursor));
+	}while(current != ringqueue_number_cas(&rb->cs[index].cursor, current, cursor));
 	if(p){
 		*p = rb->node[cursor & _RQ_MASK];
 	}
@@ -237,7 +263,7 @@ int pop_ringqueue_multiple(struct ringqueue * rb, void ** p){
 
 uint check_ringqueue_single(struct ringqueue * rq, int index){
 	if(_RQ_S == rq->mode){
-		if(rq->cursor == rq->cs[index]){
+		if(rq->cursor == rq->cs[index].cursor){
 			return 0;
 		}
 	}
