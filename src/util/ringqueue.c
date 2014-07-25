@@ -213,7 +213,7 @@ int push_ringqueue(struct ringqueue * rb, void * p){
 		}
 	}while(1);
 	if(_RQ_S == rb->mode){
-		for(index = 0; index < rb->count; index ++){
+		for(index = 0; index <= rb->count; index ++){
 			post_event(rb->cs[index].wait);
 		}
 	}else if(_RQ_M == rb->mode){
